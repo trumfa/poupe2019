@@ -1,0 +1,10 @@
+{
+  "name": "poupe-encamp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dades": "node scripts/build-data.mjs",
+    "servir": "npx --yes serve public"
+  }
+}

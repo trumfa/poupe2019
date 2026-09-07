@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consulta urbanística · POUPE 2019 · Comú d'Encamp</title>
+<meta name="description" content="Consulta el règim urbanístic de la teva unitat d'actuació a la parròquia d'Encamp.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="capcalera">
+  <div class="ampla">
+    <p class="institucio">Comú d'Encamp</p>
+    <h1>Consulta urbanística</h1>
+    <p class="subtitol">Pla d'Ordenació i Urbanisme de la Parròquia d'Encamp, revisió 2019</p>
+  </div>
+</header>
+
+<main class="ampla" id="principal">
+
+  <section class="cerca" id="cerca">
+    <label for="q">Busca la teva unitat d'actuació</label>
+    <input type="search" id="q" autocomplete="off" spellcheck="false"
+           placeholder="Nom de la unitat o referència cadastral">
+    <p class="ajuda" id="ajuda">Escriu el nom de la unitat. Si no el saps, la referència cadastral el troba per tu.</p>
+    <ul class="resultats" id="resultats" role="listbox" aria-label="Resultats"></ul>
+  </section>
+
+  <section id="detall" hidden></section>
+
+  <section class="portada" id="portada">
+    <h2>Què trobaràs aquí</h2>
+    <p>El POUPE divideix la parròquia en unitats d'actuació. Cada unitat té una fitxa que
+       determina què s'hi pot construir. Aquesta pàgina et deixa consultar la fitxa vigent de
+       cada unitat, entendre què vol dir cada terme i fer un càlcul aproximat del sostre
+       edificable i de l'impost sobre la construcció.</p>
+    <p>Tota la informació prové del text publicat al Butlletí Oficial del Principat d'Andorra.
+       Cada dada indica d'on surt. <strong>En cas de discrepància preval el text publicat al BOPA.</strong></p>
+    <nav class="enllacos">
+      <a href="#glossari">Glossari de termes</a>
+      <a href="#claus">Claus urbanístiques</a>
+      <a href="#preguntes">Preguntes freqüents</a>
+    </nav>
+  </section>
+
+  <section id="pagina" hidden></section>
+
+</main>
+
+<footer class="peu">
+  <div class="ampla">
+    <p>Servei d'informació del Comú d'Encamp. Les xifres calculades són orientatives i no
+       tenen valor de llicència ni de liquidació.</p>
+    <p class="generat" id="generat"></p>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

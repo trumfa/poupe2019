@@ -54,9 +54,11 @@ const claus = (s) =>
     .map((m) => ({ nom: m[1].trim(), clau: m[2].trim() }))
 
 console.log('Baixant el full de càlcul…')
-const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv] =
+const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv, planols] =
   await Promise.all(['UA', 'Fitxes', 'Parametres', 'Claus', 'Claus_parametres',
-    'Glossari', 'Regles_calcul', 'Tributs', 'Claus_subdivisions'].map(pestanya))
+    'Glossari', 'Regles_calcul', 'Tributs', 'Claus_subdivisions', 'Planols'].map(pestanya))
+
+const planolPerFitxa = Object.fromEntries(planols.map((p) => [p.id_fitxa, p.drive_id_imatge]))
 
 const fitxaPerId = Object.fromEntries(fitxes.map((f) => [f.id_fitxa, f]))
 const uaDeFitxa = (p) => p.id_ua || fitxaPerId[p.id_fitxa]?.id_ua || ''

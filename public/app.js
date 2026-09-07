@@ -3,9 +3,9 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const norm = (s) => (s || '').replace(/[’‘]/g, "'").normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/·/g, '').toLowerCase().trim()
 const mil = (n) => n == null ? '—' : n.toLocaleString('ca-ES', { maximumFractionDigits: 0 })
 const eur = (n) => n.toLocaleString('ca-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-const paraf = (t) => esc(t).replace(/(?<=\.)\s+(?=[A-ZÀ-Ú0-9])/g, '</p><p>').replace(/^/, '<p>').replace(/$/, '</p>')
+const paraf = (t) => esc(t).replace(/(?<=\.)\s+(?=[A-ZÀ-Ú])/g, '</p><p>').replace(/^/, '<p>').replace(/$/, '</p>')
 
-let INDEX = [], CADASTRE = {}, CONFIG = {}
+let INDEX = [], CADASTRE = {}, CONFIG = {}, GENERALS = null
 
 const fontBopa = (f) => {
   if (!f?.bopa_num) return esc(f?.volum || '')
@@ -30,7 +30,6 @@ function cercar() {
   const q = norm($('#q').value)
   const llista = $('#resultats')
   if (q.length < 2) { llista.innerHTML = ''; return }
-
   const perCadastre = CADASTRE[$('#q').value.trim().toUpperCase()] || CADASTRE[$('#q').value.trim()]
   const ids = perCadastre ? [].concat(perCadastre) : null
   const trobats = (ids ? INDEX.filter((u) => ids.includes(u.id)) : INDEX.filter((u) => u.norm.includes(q))).slice(0, 12)
@@ -41,8 +40,7 @@ function cercar() {
   }
   llista.innerHTML = trobats.map((u) => `
     <li><button data-id="${esc(u.id)}">
-      <span>${esc(u.nom)}</span>
-      <span class="meta">${esc(u.classificacio)}</span>
+      <span>${esc(u.nom)}</span><span class="meta">${esc(u.classificacio)}</span>
     </button></li>`).join('')
   llista.querySelectorAll('button').forEach((b) =>
     b.addEventListener('click', () => { location.hash = 'ua/' + b.dataset.id }))
@@ -56,7 +54,11 @@ function ruta() {
 }
 
 async function mostrarUA(id) {
-  const d = await fetch(`data/ua/${id}.json`).then((r) => r.json()).catch(() => null)
+  const [d] = await Promise.all([
+    fetch(`data/ua/${id}.json`).then((r) => r.json()).catch(() => null),
+    GENERALS ? Promise.resolve() : fetch('data/apartats-generals.json')
+      .then((r) => r.json()).then((g) => { GENERALS = g }).catch(() => { GENERALS = [] }),
+  ])
   const cont = $('#detall')
   if (!d) { cont.innerHTML = '<p class="buit">No s\'ha trobat aquesta unitat.</p>'; cont.hidden = false; return }
 
@@ -65,15 +67,9 @@ async function mostrarUA(id) {
   const v = d.versions.find((x) => x.familia !== 'area') || d.versions[0]
 
   cont.innerHTML =
-    capcaleraHTML(d, v) +
-    avisosHTML(d, v) +
-    resumHTML(v) +
-    calculadoraHTML(v) +
-    proteccionsHTML(d) +
-    fitxaHTML(d, v) +
-    clausHTML(v) +
-    condicionsHTML(v) +
-    (d.versions.length > 1 ? d.versions.filter((x) => x !== v).map((x) => altraVersioHTML(d, x)).join('') : '') +
+    capcaleraHTML(d, v) + avisosHTML(d, v) + resumHTML(v) + calculadoraHTML(v) +
+    proteccionsHTML(d) + condicionsHTML(v) + fitxaHTML(v) + clausHTML(v) +
+    d.versions.filter((x) => x !== v).map((x) => altraVersioHTML(d, x)).join('') +
     historicHTML(d)
 
   muntarCalculadora(v)
@@ -110,7 +106,7 @@ function resumHTML(v) {
   const files = []
   if (v.superficie) files.push(['Superfície de la unitat', mil(v.superficie) + ' m²'])
   if (v.edificabilitat_max) files.push(['Edificabilitat màxima', mil(v.edificabilitat_max) + ' m² de sostre'])
-  else if (v.coeficient) files.push(['Coeficient d\'edificabilitat',
+  else if (v.coeficient) files.push(["Coeficient d'edificabilitat",
     String(v.coeficient).replace('.', ',') + ' m² sostre per m² de parcel·la neta'])
   if (v.alcades) files.push(['Alçades', esc(v.alcades).replace(/;/g, '<br>')])
   if (v.parcela_minima) files.push(['Parcel·la mínima', esc(v.parcela_minima) + ' m²'])
@@ -120,7 +116,7 @@ function resumHTML(v) {
     <h3>En resum</h3>
     ${v.planol ? `<figure class="planol">
       <img src="https://drive.google.com/thumbnail?id=${esc(v.planol)}&sz=w1200"
-           alt="Plànol de ${esc(v.id_fitxa)}" loading="lazy">
+           alt="Plànol de la fitxa" loading="lazy">
       <figcaption>Plànol de la fitxa publicada al BOPA. Per a la delimitació exacta, consulta els
         plànols d'ordenació.</figcaption></figure>` : ''}
     <dl class="dades">${files.map(([k, val]) => `<dt>${k}</dt><dd>${val}</dd>`).join('')}</dl>
@@ -228,12 +224,51 @@ function proteccionsHTML(d) {
           `<li>${esc(p.nom)}${p.adreca ? ` <span class="meta">· ${esc(p.adreca)}</span>` : ''}</li>`).join('')}</ul>
         ${items[0].obligacio ? `<p class="obligacio">${esc(items[0].obligacio)}</p>` : ''}`
     }).join('')}
-    <p class="font">POUPE Vol. IX — Catàleg comunal d'edificis, espais i elements d'interès històric,
-       monumental i cultural · Normes urbanístiques, articles 81 a 84 · BOPA núm. 62, 2/6/2021</p>
+    <p class="font">POUPE Vol. IX — Catàleg comunal d'edificis, espais i elements d'interès
+       històric, monumental i cultural · Normes urbanístiques, articles 81 a 84</p>
   </div>`
 }
 
-function fitxaHTML(d, v) {
+// Condicions constructives: primer el que anomena les teves claus, després el general plegat.
+function condicionsHTML(v) {
+  const meus = v.apartats || []
+  const temes = (CONFIG.temes || []).filter((t) =>
+    meus.some((a) => a.tema === t) || (GENERALS || []).some((a) => a.tema === t))
+  if (!temes.length) return ''
+
+  return `
+  <div class="bloc">
+    <h3>Condicions constructives</h3>
+    <p>Els apartats de les Normes urbanístiques que anomenen les teves claus es mostren directament.
+       La resta de condicions, que s'apliquen a tothom, són a sota de cada tema.</p>
+    ${temes.map((t) => {
+      const propis = meus.filter((a) => a.tema === t)
+      const gen = (GENERALS || []).filter((a) => a.tema === t)
+      return `
+      <div class="tema">
+        <p class="cat">${esc(t[0].toUpperCase() + t.slice(1))}</p>
+        ${propis.length ? propis.map((a) => `
+          <div class="apartat">
+            <p class="etiqueta-ap">${esc(a.article)}.${esc(a.apartat)} · ${esc(a.titol)}
+              <span class="xip xip-clau">${a.claus.map(esc).join(' ')}</span>
+              ${a.abast === 'general amb menció' ? '<span class="meta">regla específica dins d\'un apartat general</span>' : ''}</p>
+            ${paraf(a.text)}
+          </div>`).join('')
+          : `<p class="meta">Cap apartat específic per a les teves claus.</p>`}
+        ${gen.length ? `<details class="art">
+          <summary>Condicions generals de ${esc(t)} (${gen.length} apartat${gen.length > 1 ? 's' : ''})</summary>
+          <div class="art-cos">${gen.map((a) => `
+            <p class="etiqueta-ap">${esc(a.article)}.${esc(a.apartat)}</p>${paraf(a.text)}`).join('')}</div>
+        </details>` : ''}
+      </div>`
+    }).join('')}
+    <p class="font">POUPE Vol. II — Normes urbanístiques (Modificació 04) · BOPA núm. 135, 12/11/2025.
+       L'assignació d'apartats a cada clau es fa a partir de les claus que el text de cada apartat
+       anomena expressament.</p>
+  </div>`
+}
+
+function fitxaHTML(v) {
   const camps = [
     ['Zona', v.zones.map((z) => `${esc(z.nom)} (${esc(z.clau)})`).join(', ') || '—'],
     ['Subzona', v.subzones.map((z) => `${esc(z.nom)} (${esc(z.clau)})`).join(', ') || '—'],
@@ -243,8 +278,8 @@ function fitxaHTML(d, v) {
   return `
   <div class="bloc">
     <h3>La fitxa completa</h3>
-    <details class="art" open>
-      <summary>Text de la fitxa publicada</summary>
+    <details class="art">
+      <summary>Text de la fitxa publicada al BOPA</summary>
       <div class="art-cos">
         ${v.descripcio ? paraf(v.descripcio) : ''}
         <dl class="dades">${camps.map(([k, val]) => `<dt>${k}</dt><dd>${val}</dd>`).join('')}</dl>
@@ -261,7 +296,7 @@ function clausHTML(v) {
   if (!v.claus.length) return ''
   return `
   <div class="bloc">
-    <h3>Què diuen les teves claus</h3>
+    <h3>Les teves claus</h3>
     ${v.claus.map((c) => {
       const p = c.parametres.filter((x) => x.v)
       return `<details class="art">
@@ -280,31 +315,12 @@ function clausHTML(v) {
   </div>`
 }
 
-function condicionsHTML(v) {
-  const arts = new Map()
-  v.claus.forEach((c) => (c.remissions || []).forEach((a) => arts.set(a.num, a)))
-  if (!arts.size) return ''
-  return `
-  <div class="bloc">
-    <h3>Condicions constructives</h3>
-    <p>Les teves claus remeten a aquests articles de les Normes urbanístiques. Hi trobaràs les
-       condicions de materials, acabats, cobertes, alçades i moviments de terra.</p>
-    ${[...arts.values()].sort((a, b) => a.num - b.num).map((a) => `
-      <details class="art">
-        <summary>Article ${esc(a.num)} · ${esc(a.titol)}</summary>
-        <div class="art-cos">${paraf(a.text)}</div>
-      </details>`).join('')}
-    <p class="font">POUPE Vol. II — Normes urbanístiques (Modificació 04) · BOPA núm. 135, 12/11/2025</p>
-  </div>`
-}
-
 function altraVersioHTML(d, v) {
   return `
   <div class="bloc">
     <h3>També hi ha una àrea diferenciada amb aquest nom</h3>
-    <p>${esc(d.nom)} consta també com a àrea diferenciada en sòl no urbanitzable
-       ${v.superficie ? `, de ${mil(v.superficie)} m²` : ''}. És un àmbit diferent de la unitat
-       d'actuació, amb el seu propi règim.</p>
+    <p>${esc(d.nom)} consta també com a àrea diferenciada en sòl no urbanitzable${v.superficie ? `, de ${mil(v.superficie)} m²` : ''}.
+       És un àmbit diferent de la unitat d'actuació, amb el seu propi règim.</p>
     ${v.descripcio ? `<details class="art"><summary>Veure la fitxa</summary>
       <div class="art-cos">${paraf(v.descripcio)}</div></details>` : ''}
     <p class="font">${fontBopa(v.font)}</p>
@@ -337,11 +353,8 @@ async function pagina(nom) {
   if (nom === 'glossari') {
     const g = await fetch('data/glossari.json').then((r) => r.json())
     cont.innerHTML = `<div class="bloc"><h3>Glossari</h3>${g.map((t) => `
-      <div class="terme">
-        <p class="cat">${esc(t.terme)}</p>
-        <p>${esc(t.definicio_planera)}</p>
-        <p class="font">${esc(t.font)}${t.article ? ', ' + esc(t.article) : ''}</p>
-      </div>`).join('')}</div>`
+      <div class="terme"><p class="cat">${esc(t.terme)}</p><p>${esc(t.definicio_planera)}</p>
+        <p class="font">${esc(t.font)}${t.article ? ', ' + esc(t.article) : ''}</p></div>`).join('')}</div>`
   } else if (nom === 'claus') {
     const c = await fetch('data/claus.json').then((r) => r.json())
     cont.innerHTML = `<div class="bloc"><h3>Claus urbanístiques</h3>
@@ -350,17 +363,21 @@ async function pagina(nom) {
         <span class="meta"><br>${esc(x.article)}</span></dd>`).join('')}</dl></div>`
   } else if (nom === 'normativa') {
     const a = await fetch('data/normativa.json').then((r) => r.json())
+    const arts = [...new Set(a.map((x) => x.article))]
     cont.innerHTML = `<div class="bloc"><h3>Normes urbanístiques</h3>
-      ${a.map((x) => `<details class="art"><summary>${esc(x.article)} · ${esc(x.titol)}</summary>
-        <div class="art-cos">${paraf(x.text)}</div></details>`).join('')}
+      ${arts.map((art) => {
+        const ap = a.filter((x) => x.article === art)
+        return `<details class="art"><summary>${esc(art)} · ${esc(ap[0].titol)}</summary>
+          <div class="art-cos">${ap.map((x) => `<p class="etiqueta-ap">${esc(x.apartat)}.${
+            x.claus?.length ? ` <span class="xip xip-clau">${x.claus.map(esc).join(' ')}</span>` : ''}</p>
+            ${paraf(x.text)}`).join('')}</div></details>`
+      }).join('')}
       <p class="font">POUPE Vol. II (Modificació 04) · BOPA núm. 135, 12/11/2025</p></div>`
   } else if (nom === 'preguntes') {
     const r = await fetch('data/regles.json').then((res) => res.json())
     cont.innerHTML = `<div class="bloc"><h3>Preguntes freqüents</h3>${r
       .filter((x) => x.estat !== 'NO CALCULABLE' && x.nom && !String(x.id_regla).startsWith('PARAM'))
-      .map((x) => `<div class="terme">
-        <p class="cat">${esc(x.nom)}</p>
-        <p>${esc(x.formula)}</p>
+      .map((x) => `<div class="terme"><p class="cat">${esc(x.nom)}</p><p>${esc(x.formula)}</p>
         ${x.observacions ? `<p class="meta">${esc(x.observacions)}</p>` : ''}
         <p class="font">${esc(x.font)}, ${esc(x.article)}</p></div>`).join('')}</div>`
   }

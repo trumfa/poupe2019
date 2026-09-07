@@ -172,3 +172,14 @@ ul.hist { list-style: none; margin: 1rem 0 0; padding: 0; }
   .calaix-cap p { font-size: .95rem; }
   .calaix-cos { padding: 1rem 1.2rem 3rem; }
 }
+
+/* avís de patrimoni amb la llista de béns */
+.nota-prot { flex-direction: column; align-items: stretch; }
+.llista-prot { list-style: none; margin: .7rem 0 0; padding: 0; display: grid; gap: .35rem; }
+.llista-prot li { font-size: .92rem; }
+.llista-prot .meta { display: block; }
+.ressaltat { animation: ressalta 1.6s ease-out; border-radius: var(--r); }
+@keyframes ressalta {
+  0%, 40% { background: var(--accent-suau); box-shadow: 0 0 0 12px var(--accent-suau); }
+  100% { background: transparent; box-shadow: 0 0 0 12px transparent; }
+}

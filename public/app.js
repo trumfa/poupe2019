@@ -125,8 +125,14 @@ function lligaBotons(cont) {
   cont.querySelectorAll('[data-art]').forEach((b) =>
     b.addEventListener('click', () => obreArticle(b.dataset.art)))
   cont.querySelectorAll('[data-scroll]').forEach((b) =>
-    b.addEventListener('click', () => document.getElementById(b.dataset.scroll)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })))
+    b.addEventListener('click', () => {
+      const el = document.getElementById(b.dataset.scroll)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      el.classList.remove('ressaltat')
+      void el.offsetWidth
+      el.classList.add('ressaltat')
+    }))
 }
 
 // ---------- cerca ----------
@@ -203,10 +209,20 @@ function capcaleraHTML(d, v) {
 
 function avisosHTML(d, v) {
   let h = ''
-  if (d.proteccions?.length) h += `<div class="nota">
-    <p><strong>Patrimoni protegit.</strong> Hi ha ${d.proteccions.length}
-    bé${d.proteccions.length > 1 ? 'ns' : ''} catalogat${d.proteccions.length > 1 ? 's' : ''} en aquest àmbit.</p>
-    <button class="btn btn-petit" data-scroll="patrimoni">Veure quins</button></div>`
+  if (d.proteccions?.length) {
+    const p = d.proteccions
+    const cats = [...new Set(p.map((x) => x.categoria))]
+    h += `<div class="nota nota-prot">
+      <p><strong>Patrimoni protegit.</strong> Aquest àmbit té ${p.length}
+        bé${p.length > 1 ? 'ns' : ''} catalogat${p.length > 1 ? 's' : ''}.
+        Abans de projectar cap actuació, comprova quines obligacions t'afecten.</p>
+      <ul class="llista-prot">${p.slice(0, 6).map((x) =>
+        `<li><strong>${esc(x.nom)}</strong>
+          <span class="meta">${esc(maj(x.categoria.toLowerCase()))}${x.adreca ? ' · ' + esc(x.adreca) : ''}</span></li>`).join('')}
+        ${p.length > 6 ? `<li class="meta">i ${p.length - 6} més</li>` : ''}</ul>
+      <div class="botons"><button class="btn btn-petit" data-scroll="patrimoni">Quines obligacions comporta</button></div>
+    </div>`
+  }
   if (v.revisar) h += `<div class="nota nota-avis">
     <p><strong>Dada pendent de comprovació:</strong> ${esc(v.revisar)}. Contrasta-la amb la publicació oficial abans de fer-la servir.</p></div>`
   return h

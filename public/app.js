@@ -100,7 +100,12 @@ function fitxaHTML(d, v) {
 
   <div class="bloc">
     <h3>La teva fitxa</h3>
-    ${v.descripcio ? `<p>${esc(v.descripcio)}</p>` : ''}
+        ${v.descripcio ? `<p>${esc(v.descripcio)}</p>` : ''}
+    ${v.planol ? `<figure class="planol">
+      <img src="https://drive.google.com/thumbnail?id=${esc(v.planol)}&sz=w1200"
+           alt="Plànol de situació de ${esc(d.nom)}" loading="lazy">
+      <figcaption>Plànol de la fitxa. Per a la delimitació exacta, consulta els plànols d'ordenació.</figcaption>
+    </figure>` : ''}
     <dl class="dades">${dades.map(([k, val]) => `<dt>${k}</dt><dd>${val}</dd>`).join('')}</dl>
     ${v.usos ? `<p style="margin-top:1rem">${esc(v.usos)}</p>` : ''}
     ${v.gestio ? `<p><strong>Gestió:</strong> ${esc(v.gestio)}</p>` : ''}

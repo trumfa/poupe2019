@@ -67,10 +67,16 @@ const claus = (s) =>
     .map((m) => ({ nom: m[1].trim(), clau: m[2].trim() }))
 
 console.log('Baixant el full de càlcul…')
-const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv, planols, prot] =
+const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv, planols, prot, normativa] =
   await Promise.all(['UA', 'Fitxes', 'Parametres', 'Claus', 'Claus_parametres',
     'Glossari', 'Regles_calcul', 'Tributs', 'Claus_subdivisions', 'Planols',
-    'Proteccions'].map(pestanya))
+    'Proteccions', 'Normativa'].map(pestanya))
+
+const artPerNum = {}
+for (const a of normativa) {
+  const n = String(a.article || '').match(/(\d+)/)
+  if (n) artPerNum[n[1]] = a
+}
 
 const planolPerFitxa = Object.fromEntries(planols.map((p) => [p.id_fitxa, p.drive_id_imatge]))
 const fitxaPerId = Object.fromEntries(fitxes.map((f) => [f.id_fitxa, f]))
@@ -144,6 +150,13 @@ for (const u of ua) {
           parametres: paramsDeClau(c)
             .map((x) => ({ p: x.parametre, v: x.valor, n: x.valor_numeric, u: x.unitat, remet: x.remet_a })),
           subdivisions: subdivDeClau(c).map((s) => ({ codi: s.codi, nom: s.denominacio })),
+          remissions: [...new Set(paramsDeClau(c).flatMap((x) =>
+            String(x.remet_a || '').split(';').map((s) => s.trim()).filter(Boolean)))]
+            .sort((a, b) => a - b)
+            .map((n) => artPerNum[n]
+              ? { num: n, titol: artPerNum[n].titol || '', text: artPerNum[n].text || '' }
+              : null)
+            .filter(Boolean),
         }
       }),
       font: {
@@ -184,6 +197,8 @@ await writeFile(`${OUT}/index.json`, JSON.stringify(index))
 await writeFile(`${OUT}/glossari.json`, JSON.stringify(glossari))
 await writeFile(`${OUT}/claus.json`, JSON.stringify(cls))
 await writeFile(`${OUT}/proteccions.json`, JSON.stringify(prot))
+await writeFile(`${OUT}/normativa.json`, JSON.stringify(
+  normativa.map((a) => ({ article: a.article, titol: a.titol, text: a.text, font: a.font }))))
 await writeFile(`${OUT}/regles.json`, JSON.stringify(
   regles.filter((r) => r.estat !== 'PENDENT DE REDACTAR')))
 await writeFile(`${OUT}/config.json`, JSON.stringify({
@@ -194,7 +209,6 @@ await writeFile(`${OUT}/config.json`, JSON.stringify({
 
 console.log(`\n${index.length} unitats generades a ${OUT}`)
 console.log(`${index.filter((i) => i.revisar).length} amb dades pendents de revisió`)
-console.log(`${planols.length} plànols enllaçats`)
-console.log(`${prot.length} béns protegits, ${index.filter((i) => i.proteccions).length} unitats amb protecció`)
+console.log(`${planols.length} plànols · ${prot.length} béns protegits · ${normativa.length} articles`)
 if (!tributs.length) console.log('AVÍS: la pestanya Tributs és buida.')
 if (senseClau.size) console.log(`Claus sense definició al Volum II: ${[...senseClau].join(', ')}`)

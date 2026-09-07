@@ -109,3 +109,6 @@ table.hist td:last-child { text-align: right; white-space: nowrap; }
 .peu p { margin: 0 0 .4rem; }
 
 .buit { color: var(--suau); padding: 1rem 0; }
+.planol { margin: 1.25rem 0; }
+.planol img { width: 100%; height: auto; display: block; background: var(--full); border: 1px solid var(--regla); }
+.planol figcaption { font-size: .82rem; color: var(--suau); margin-top: .4rem; }

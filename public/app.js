@@ -62,7 +62,7 @@ async function mostrarUA(id) {
 
   $('#portada').hidden = true
   cont.hidden = false
-  cont.innerHTML = d.versions.map((v) => fitxaHTML(d, v)).join('') + historicHTML(d)
+    cont.innerHTML = d.versions.map((v) => fitxaHTML(d, v)).join('') + proteccionsHTML(d) + historicHTML(d)
   muntarCalculadores(d)
   cont.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -278,5 +278,23 @@ async function pagina(nom) {
   }
   cont.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
-
+function proteccionsHTML(d) {
+  if (!d.proteccions?.length) return ''
+  const cats = [...new Set(d.proteccions.map((p) => p.categoria))]
+  return `
+  <div class="bloc">
+    <h3>Proteccions del patrimoni</h3>
+    <div class="avis"><p>Aquesta unitat té béns o espais protegits. Abans de projectar cap
+      actuació, comprova quines obligacions t'afecten.</p></div>
+    ${cats.map((c) => {
+      const items = d.proteccions.filter((p) => p.categoria === c)
+      return `<p style="margin:1.2rem 0 .4rem"><strong>${esc(c)}</strong></p>
+        <ul style="margin:0 0 .6rem;padding-left:1.2rem">${items.map((p) =>
+          `<li>${esc(p.nom)}${p.adreca ? ` <span style="color:var(--suau)">· ${esc(p.adreca)}</span>` : ''}</li>`).join('')}</ul>
+        ${items[0].obligacio ? `<p style="font-size:.93rem">${esc(items[0].obligacio)}</p>` : ''}`
+    }).join('')}
+    <p class="font">POUPE Vol. IX — Catàleg comunal d'edificis, espais i elements d'interès històric,
+       monumental i cultural · Normes urbanístiques, articles 81 a 84 · BOPA núm. 62, 2/6/2021</p>
+  </div>`
+}
 inici()

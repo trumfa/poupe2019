@@ -7,8 +7,9 @@
   --pissarra: #37585e;
   --avis: #8a5a12;
   --avis-fons: #f7eedd;
+  --prot: #6b3f6e;
+  --prot-fons: #f3ecf4;
   --ok: #2c5c3c;
-  --mida: 17px;
 }
 
 * { box-sizing: border-box; }
@@ -18,7 +19,7 @@ body {
   background: var(--paper);
   color: var(--tinta);
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
-  font-size: var(--mida);
+  font-size: 17px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -37,7 +38,7 @@ input[type=search], input[type=text], select {
   width: 100%; padding: .7rem .85rem; font: inherit; color: inherit;
   background: var(--full); border: 1px solid var(--regla); border-radius: 3px;
 }
-input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible, summary:focus-visible {
   outline: 2px solid var(--pissarra); outline-offset: 2px;
 }
 .ajuda { margin: .5rem 0 0; font-size: .88rem; color: var(--suau); }
@@ -50,7 +51,7 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
   display: flex; justify-content: space-between; gap: 1rem; align-items: baseline;
 }
 .resultats button:hover { background: var(--full); }
-.resultats .meta { font-size: .82rem; color: var(--suau); white-space: nowrap; }
+.meta { font-size: .85rem; color: var(--suau); }
 
 .portada h2 { font-size: 1.15rem; font-weight: 600; margin: 2.5rem 0 .75rem; }
 .portada p { margin: 0 0 1rem; max-width: 40rem; }
@@ -58,20 +59,22 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 .enllacos a { color: var(--pissarra); }
 
 .titol-ua { margin: 1rem 0 0; }
-.titol-ua h2 { font-size: 1.9rem; font-weight: 600; letter-spacing: -.02em; margin: 0 0 .3rem; }
+.titol-ua h2 { font-size: 1.9rem; font-weight: 600; letter-spacing: -.02em; margin: .4rem 0 .3rem; }
 .tira { display: flex; flex-wrap: wrap; gap: .4rem; margin: .75rem 0 0; }
-.xip {
-  font-size: .8rem; padding: .2rem .6rem; border-radius: 2px;
-  background: var(--full); border: 1px solid var(--regla);
-}
+.xip { font-size: .8rem; padding: .2rem .6rem; border-radius: 2px; background: var(--full); border: 1px solid var(--regla); }
 .xip-clau { font-family: 'IBM Plex Mono', monospace; }
 .xip-vig { background: #e6efe7; border-color: #bcd3bf; color: var(--ok); }
 
 .bloc { border-top: 1px solid var(--regla); padding: 1.75rem 0 .5rem; margin-top: 1.5rem; }
 .bloc h3 { font-size: 1.05rem; font-weight: 600; margin: 0 0 .9rem; }
 .bloc p { margin: 0 0 .8rem; }
+.cat { font-weight: 500; margin: 1.3rem 0 .4rem; }
+.llista { margin: 0 0 .6rem; padding-left: 1.2rem; }
+.llista li { margin-bottom: .2rem; }
+.obligacio { font-size: .93rem; background: var(--full); border-left: 3px solid var(--regla); padding: .6rem .8rem; }
+.terme { margin-bottom: 1.6rem; }
 
-dl.dades { margin: 0; display: grid; grid-template-columns: 11rem 1fr; gap: .5rem 1rem; }
+dl.dades { margin: .8rem 0; display: grid; grid-template-columns: 12rem 1fr; gap: .5rem 1rem; }
 dl.dades dt { color: var(--suau); font-size: .92rem; }
 dl.dades dd { margin: 0; }
 @media (max-width: 34rem) {
@@ -79,36 +82,46 @@ dl.dades dd { margin: 0; }
   dl.dades dd { margin-bottom: .7rem; }
 }
 
-.font {
-  font-size: .82rem; color: var(--suau); margin: 1.1rem 0 0;
-  padding-top: .6rem; border-top: 1px dotted var(--regla);
-}
+.planol { margin: 0 0 1.25rem; }
+.planol img { width: 100%; height: auto; display: block; background: var(--full); border: 1px solid var(--regla); }
+.planol figcaption { font-size: .82rem; color: var(--suau); margin-top: .4rem; }
+
+.font { font-size: .82rem; color: var(--suau); margin: 1.1rem 0 0; padding-top: .6rem; border-top: 1px dotted var(--regla); }
 .font a { color: var(--pissarra); }
 
-.avis { background: var(--avis-fons); border-left: 3px solid var(--avis); padding: .85rem 1rem; margin: 1rem 0; }
+.avis { background: var(--avis-fons); border-left: 3px solid var(--avis); padding: .85rem 1rem; margin: 1.25rem 0; }
 .avis p { margin: 0; font-size: .92rem; color: var(--avis); }
+.avis-prot { background: var(--prot-fons); border-left-color: var(--prot); }
+.avis-prot p { color: var(--prot); }
+
+.art { border-bottom: 1px solid var(--regla); }
+.art:first-of-type { border-top: 1px solid var(--regla); }
+.art summary { cursor: pointer; padding: .75rem .25rem; font-size: .95rem; list-style: none; display: flex; gap: .5rem; align-items: baseline; }
+.art summary::-webkit-details-marker { display: none; }
+.art summary::before { content: '+'; color: var(--pissarra); width: .9rem; flex: none; }
+.art[open] summary::before { content: '–'; }
+.art summary:hover { background: var(--full); }
+.art-cos { padding: .2rem .25rem 1.2rem 1.65rem; font-size: .93rem; }
+.art-cos p { margin: 0 0 .7rem; }
+.art-cos dl.dades { margin-top: .5rem; }
 
 .calc-camps { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
 .calc-camps label { display: block; font-size: .9rem; color: var(--suau); margin-bottom: .35rem; }
 .resultat { background: var(--full); border: 1px solid var(--regla); padding: 1rem 1.15rem; }
 .resultat + .resultat { margin-top: .6rem; }
 .resultat .xifra { font-size: 1.7rem; font-weight: 600; letter-spacing: -.02em; margin: .1rem 0; }
-.resultat .com { font-size: .88rem; color: var(--suau); margin: 0; }
-.resultat .etiqueta { font-size: .88rem; color: var(--suau); margin: 0; }
+.resultat .com, .resultat .etiqueta { font-size: .88rem; color: var(--suau); margin: 0; }
 .opcions { margin: 1rem 0 0; font-size: .92rem; }
-.opcions label { display: block; margin-bottom: .35rem; }
+.opcions label { display: block; }
 
 table.hist { width: 100%; border-collapse: collapse; font-size: .93rem; }
 table.hist th { text-align: left; font-weight: 500; color: var(--suau); font-size: .85rem; padding-bottom: .4rem; }
 table.hist td { padding: .55rem 0; border-top: 1px solid var(--regla); vertical-align: top; }
 table.hist td:last-child { text-align: right; white-space: nowrap; }
 
-.enrere { background: none; border: 0; padding: 0; font: inherit; color: var(--pissarra); cursor: pointer; }
+.enrere { background: none; border: 0; padding: 0; font: inherit; font-size: .9rem; color: var(--pissarra); cursor: pointer; }
 
 .peu { border-top: 1px solid var(--regla); padding: 1.75rem 0 3rem; font-size: .88rem; color: var(--suau); }
 .peu p { margin: 0 0 .4rem; }
 
 .buit { color: var(--suau); padding: 1rem 0; }
-.planol { margin: 1.25rem 0; }
-.planol img { width: 100%; height: auto; display: block; background: var(--full); border: 1px solid var(--regla); }
-.planol figcaption { font-size: .82rem; color: var(--suau); margin-top: .4rem; }

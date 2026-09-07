@@ -3,17 +3,33 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const norm = (s) => (s || '').replace(/[’‘]/g, "'").normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/·/g, '').toLowerCase().trim()
 const mil = (n) => n == null ? '—' : n.toLocaleString('ca-ES', { maximumFractionDigits: 0 })
 const eur = (n) => n.toLocaleString('ca-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-const paraf = (t) => esc(t).replace(/(?<=\.)\s+(?=[A-ZÀ-Ú])/g, '</p><p>').replace(/^/, '<p>').replace(/$/, '</p>')
 
-// Primera frase literal del text. No és un resum: és el text tal com està publicat.
-function entrada(t, max = 260) {
-  const s = String(t || '').trim()
+// Majúscula inicial i neteja de restes de numeració.
+const maj = (s) => {
+  const t = String(s || '').trim().replace(/^[a-z]\)\s*/, '').replace(/^\d{1,2}\.\s*/, '')
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : ''
+}
+const paraf = (t) => maj(esc(t)).replace(/(?<=\.)\s+(?=[A-ZÀ-Ú])/g, '</p><p>').replace(/^/, '<p>').replace(/$/, '</p>')
+
+// Primera frase literal. No és un resum: és el text tal com està publicat.
+function entrada(t, max = 240) {
+  const s = maj(t)
+  if (s.length <= max) return s
   const tall = s.slice(0, max)
   const punt = tall.lastIndexOf('. ')
-  return punt > 60 ? tall.slice(0, punt + 1) : (s.length > max ? tall + '…' : s)
+  return punt > 60 ? tall.slice(0, punt + 1) : tall.replace(/\s\S*$/, '…')
 }
 
-let INDEX = [], CADASTRE = {}, CONFIG = {}, GENERALS = null, ARTICLES = null
+// Grups temàtics: agrupen els temes de les Normes en blocs comprensibles.
+const GRUPS = [
+  { nom: 'La parcel·la', temes: ['parcel·la i separacions', 'dimensions', 'superfícies'] },
+  { nom: 'Alçades i volums', temes: ['alçades', 'volums i cossos volats'] },
+  { nom: "Acabats de l'edifici", temes: ['cobertes', 'façanes i acabats', 'obertures'] },
+  { nom: 'Moviments de terra', temes: ['moviments de terra'] },
+  { nom: 'Usos, aparcament i altres', temes: ['usos', 'aparcament', 'construcció i habitabilitat', 'edificacions auxiliars', 'obres provisionals'] },
+]
+
+let INDEX = [], CADASTRE = {}, CONFIG = {}, GENERALS = null, ARTICLES = null, CLAUS_ARA = []
 
 async function inici() {
   const [idx, cfg] = await Promise.all([
@@ -35,44 +51,82 @@ async function inici() {
     $('#hamb').classList.toggle('obert', !obert)
   })
   $('#menu').addEventListener('click', () => { $('#menu').hidden = true; $('#hamb').classList.remove('obert') })
-  $('#calaix-tanca').addEventListener('click', tancaCalaix)
-  $('#calaix-fons').addEventListener('click', tancaCalaix)
+  $('#calaix-tanca').addEventListener('click', () => tancaCalaix())
+  $('#calaix-fons').addEventListener('click', () => tancaCalaix())
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') tancaCalaix() })
 
+  // Tancar arrossegant avall (mòbil)
+  let y0 = null
+  const cal = $('#calaix')
+  cal.addEventListener('touchstart', (e) => {
+    y0 = $('#calaix-cos').scrollTop <= 0 ? e.touches[0].clientY : null
+  }, { passive: true })
+  cal.addEventListener('touchmove', (e) => {
+    if (y0 === null) return
+    const dy = e.touches[0].clientY - y0
+    if (dy > 0) cal.style.transform = `translateY(${dy}px)`
+  }, { passive: true })
+  cal.addEventListener('touchend', (e) => {
+    if (y0 === null) return
+    const dy = (e.changedTouches[0].clientY - y0)
+    cal.style.transform = ''
+    if (dy > 110) tancaCalaix()
+    y0 = null
+  })
+
   window.addEventListener('hashchange', ruta)
+  window.addEventListener('popstate', () => { if (!$('#calaix').hidden) tancaCalaix(true) })
   ruta()
 }
 
-// ---------- calaix lateral amb el text dels articles ----------
-async function obreArticle(nu) {
+// ---------- calaix lateral / full inferior ----------
+async function obreArticle(nu, sencer = false) {
   if (!ARTICLES) ARTICLES = await fetch('data/articles.json').then((r) => r.json()).catch(() => ({}))
   const a = ARTICLES[nu]
   if (!a) return
+  const meus = new Set(CLAUS_ARA.map((c) => c.toUpperCase()))
+  const aplica = (x) => !x.claus?.length || x.claus.some((c) => meus.has(c))
+  const llista = sencer || !meus.size ? a.apartats : a.apartats.filter(aplica)
+  const ocults = a.apartats.length - llista.length
+
   $('#calaix-titol').textContent = `Article ${a.num} · ${a.titol}`
-  $('#calaix-cos').innerHTML = a.apartats.map((x) => `
-    <p class="ap-num">${esc(a.num)}.${esc(x.apartat)}${x.claus?.length
-      ? ` <span class="xip xip-clau">${x.claus.map(esc).join(' ')}</span>` : ''}</p>
-    ${paraf(x.text)}`).join('') +
-    `<p class="font">POUPE Vol. II — Normes urbanístiques (Modificació 04) ·
-      BOPA núm. 135, 12/11/2025</p>`
+  $('#calaix-cos').innerHTML =
+    (ocults > 0 ? `<div class="nota"><p>Es mostren els ${llista.length} apartats aplicables a les
+       teves claus. N'hi ha ${ocults} més que regulen altres claus.</p>
+       <button class="btn btn-petit" data-sencer="${esc(nu)}">Veure l'article sencer</button></div>` : '') +
+    llista.map((x) => `
+      <p class="ap-num">${esc(a.num)}.${esc(x.apartat)}${x.claus?.length
+        ? ` <span class="xip xip-clau">${x.claus.map(esc).join(' ')}</span>` : ''}</p>
+      ${paraf(x.text)}`).join('') +
+    `<p class="font">POUPE Vol. II — Normes urbanístiques (Modificació 04) · BOPA núm. 135, 12/11/2025</p>
+     <div class="botons"><button class="btn btn-ple" id="tanca-baix">Tancar</button></div>`
+
+  $('#calaix-cos').querySelectorAll('[data-sencer]').forEach((b) =>
+    b.addEventListener('click', () => obreArticle(b.dataset.sencer, true)))
+  $('#tanca-baix')?.addEventListener('click', () => tancaCalaix())
+
   $('#calaix').hidden = false; $('#calaix-fons').hidden = false
   document.body.classList.add('bloquejat')
   $('#calaix-cos').scrollTop = 0
+  if (!history.state?.calaix) history.pushState({ calaix: true }, '')
 }
-function tancaCalaix() {
+
+function tancaCalaix(perHistorial) {
+  if ($('#calaix').hidden) return
   $('#calaix').hidden = true; $('#calaix-fons').hidden = true
+  $('#calaix').style.transform = ''
   document.body.classList.remove('bloquejat')
+  if (!perHistorial && history.state?.calaix) history.back()
 }
-const btnArt = (n, txt) => `<button class="btn btn-art" data-art="${esc(n)}">${txt || 'Article ' + esc(n)}</button>`
+
+const btnArt = (n, txt) => n ? `<button class="btn" data-art="${esc(n)}">${txt || 'Article ' + esc(n)}</button>` : ''
 
 function lligaBotons(cont) {
   cont.querySelectorAll('[data-art]').forEach((b) =>
     b.addEventListener('click', () => obreArticle(b.dataset.art)))
   cont.querySelectorAll('[data-scroll]').forEach((b) =>
-    b.addEventListener('click', () => {
-      const el = document.getElementById(b.dataset.scroll)
-      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.open = true }
-    }))
+    b.addEventListener('click', () => document.getElementById(b.dataset.scroll)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })))
 }
 
 // ---------- cerca ----------
@@ -86,7 +140,7 @@ function cercar() {
   llista.innerHTML = trobats.length
     ? trobats.map((u) => `<li><button data-id="${esc(u.id)}"><span>${esc(u.nom)}</span>
         <span class="meta">${esc(u.classificacio)}</span></button></li>`).join('')
-    : `<li class="buit">Cap unitat amb aquest nom. Prova amb una part del nom, o consulta al Comú.</li>`
+    : `<li class="buit">Cap unitat amb aquest nom. Prova amb una part del nom.</li>`
   llista.querySelectorAll('button').forEach((b) =>
     b.addEventListener('click', () => { location.hash = 'ua/' + b.dataset.id }))
 }
@@ -94,13 +148,13 @@ function cercar() {
 function ruta() {
   const h = location.hash.slice(1)
   $('#detall').hidden = true; $('#pagina').hidden = true; $('#cerca').hidden = false
-  tancaCalaix()
+  tancaCalaix(true)
   if (h.startsWith('ua/')) mostrarUA(h.slice(3))
   else if (h) pagina(h)
-  else { $('#q').value = ''; $('#resultats').innerHTML = ''; $('#tria').value = ''; window.scrollTo(0, 0) }
+  else { $('#q').value = ''; $('#resultats').innerHTML = ''; $('#tria').value = ''; CLAUS_ARA = []; window.scrollTo(0, 0) }
 }
 
-// ---------- fitxa d'una unitat ----------
+// ---------- fitxa ----------
 async function mostrarUA(id) {
   const [d] = await Promise.all([
     fetch(`data/ua/${id}.json`).then((r) => r.json()).catch(() => null),
@@ -113,15 +167,16 @@ async function mostrarUA(id) {
   $('#cerca').hidden = true
   cont.hidden = false
   const v = d.versions.find((x) => x.familia !== 'area') || d.versions[0]
+  CLAUS_ARA = v.claus.map((c) => c.clau)
 
   cont.innerHTML = `<div class="cont">
     ${capcaleraHTML(d, v)}
     ${avisosHTML(d, v)}
-    ${fitxaHTML(d, v)}
+    ${fitxaHTML(v)}
     ${calculadoraHTML(v)}
-    ${patrimoniHTML(d)}
-    ${condicionsHTML(v)}
     ${clausHTML(v)}
+    ${condicionsHTML(v)}
+    ${patrimoniHTML(d)}
     ${d.versions.filter((x) => x !== v).map((x) => altraVersioHTML(d, x)).join('')}
     ${historicHTML(d)}
   </div>`
@@ -134,8 +189,8 @@ async function mostrarUA(id) {
 function capcaleraHTML(d, v) {
   const esArea = v.familia === 'area'
   return `
-  <div class="titol-ua">
-    <p class="molla"><a href="#">Consulta</a> · ${esc(esArea ? 'Àrea diferenciada' : "Unitat d'actuació")}</p>
+  <header class="titol-ua">
+    <p class="molla"><a href="#">Consulta</a> › ${esc(esArea ? 'Àrea diferenciada' : "Unitat d'actuació")}</p>
     <h1>${esc(d.nom)}</h1>
     <div class="tira">
       <span class="xip xip-vig">Vigent ${esc(v.modificacio)}</span>
@@ -143,49 +198,50 @@ function capcaleraHTML(d, v) {
       ${v.superficie ? `<span class="xip">${mil(v.superficie)} m²</span>` : ''}
       ${v.claus.map((c) => `<span class="xip xip-clau" title="${esc(c.denominacio)}">${esc(c.clau)}</span>`).join('')}
     </div>
-  </div>`
+  </header>`
 }
 
 function avisosHTML(d, v) {
   let h = ''
   if (d.proteccions?.length) h += `<div class="nota">
     <p><strong>Patrimoni protegit.</strong> Hi ha ${d.proteccions.length}
-    bé${d.proteccions.length > 1 ? 'ns' : ''} amb protecció en aquest àmbit.</p>
+    bé${d.proteccions.length > 1 ? 'ns' : ''} catalogat${d.proteccions.length > 1 ? 's' : ''} en aquest àmbit.</p>
     <button class="btn btn-petit" data-scroll="patrimoni">Veure quins</button></div>`
   if (v.revisar) h += `<div class="nota nota-avis">
-    <p><strong>Dada pendent de comprovació:</strong> ${esc(v.revisar)}. Contrasta-la al Comú.</p></div>`
+    <p><strong>Dada pendent de comprovació:</strong> ${esc(v.revisar)}. Contrasta-la amb la publicació oficial abans de fer-la servir.</p></div>`
   return h
 }
 
-function fitxaHTML(d, v) {
-  const files = []
-  if (v.superficie) files.push(['Superfície de la unitat', mil(v.superficie) + ' m²'])
-  files.push(['Classificació del sòl', esc(v.classificacio) || '—'])
-  files.push(['Zona', v.zones.map((z) => `${esc(z.nom)} (${esc(z.clau)})`).join(', ') || '—'])
-  files.push(['Subzona', v.subzones.map((z) => `${esc(z.nom)} (${esc(z.clau)})`).join(', ') || '—'])
-  if (v.edificabilitat_max) files.push(['Edificabilitat màxima', mil(v.edificabilitat_max) + ' m² de sostre'])
-  else if (v.coeficient) files.push(["Coeficient d'edificabilitat",
-    String(v.coeficient).replace('.', ',') + ' m² sostre per m² de parcel·la neta'])
-  if (v.alcades) files.push(['Alçades', esc(v.alcades).replace(/;/g, '<br>')])
-  if (v.parcela_minima) files.push(['Parcel·la mínima', esc(v.parcela_minima) + ' m²'])
-  if (v.sistema_ordenacio) files.push(["Sistema d'ordenació", esc(v.sistema_ordenacio)])
-  if (v.gestio) files.push(['Gestió', esc(entrada(v.gestio, 180))])
-
-  const pdf = v.font.drive_id
-    ? `<a class="btn" href="https://drive.google.com/file/d/${v.font.drive_id}/view"
-         target="_blank" rel="noopener">Obrir la fitxa oficial (PDF)</a>` : ''
+function fitxaHTML(v) {
+  const dada = (k, val) => val ? `<div class="dada"><span class="k">${k}</span><span class="val">${val}</span></div>` : ''
+  const destacat = v.edificabilitat_max
+    ? `<div class="destacat"><p class="k">Edificabilitat màxima de la unitat</p>
+        <p class="xifra">${mil(v.edificabilitat_max)} m²</p><p class="com">de sostre</p></div>`
+    : v.coeficient
+    ? `<div class="destacat"><p class="k">Coeficient d'edificabilitat</p>
+        <p class="xifra">${String(v.coeficient).replace('.', ',')}</p>
+        <p class="com">m² de sostre per m² de parcel·la neta</p></div>` : ''
 
   return `
   <section class="bloc">
     <h2>Fitxa urbanística</h2>
     ${v.planol ? `<figure class="planol">
-      <img src="https://drive.google.com/thumbnail?id=${esc(v.planol)}&sz=w1200"
-           alt="Plànol de la fitxa" loading="lazy">
-      <figcaption>Plànol de la fitxa. Per a la delimitació exacta, consulta els plànols d'ordenació.</figcaption>
-    </figure>` : ''}
-    <dl class="dades">${files.map(([k, val]) => `<dt>${k}</dt><dd>${val}</dd>`).join('')}</dl>
-    ${v.usos ? `<p class="usos">${esc(v.usos)}</p>` : ''}
-    <div class="botons">${pdf}</div>
+      <img src="https://drive.google.com/thumbnail?id=${esc(v.planol)}&sz=w1200" alt="Plànol de la fitxa" loading="lazy">
+      <figcaption>Plànol de la fitxa. Per a la delimitació exacta, consulta els plànols d'ordenació.</figcaption></figure>` : ''}
+    ${destacat}
+    <div class="graella">
+      ${dada('Superfície de la unitat', v.superficie ? mil(v.superficie) + ' m²' : '')}
+      ${dada('Classificació del sòl', esc(v.classificacio))}
+      ${dada('Zona', v.zones.map((z) => `${esc(z.nom)} <span class="xip xip-clau">${esc(z.clau)}</span>`).join(' '))}
+      ${dada('Subzona', v.subzones.map((z) => `${esc(z.nom)} <span class="xip xip-clau">${esc(z.clau)}</span>`).join(' '))}
+      ${dada('Alçades màximes', v.alcades ? maj(esc(v.alcades)).replace(/;/g, '<br>') : '')}
+      ${dada('Parcel·la mínima', v.parcela_minima ? esc(v.parcela_minima) + ' m²' : '')}
+      ${dada("Sistema d'ordenació", esc(v.sistema_ordenacio))}
+    </div>
+    ${v.usos ? `<p class="usos">${esc(maj(v.usos))}</p>` : ''}
+    ${v.gestio ? `<p class="usos">${esc(entrada(v.gestio, 300))}</p>` : ''}
+    <div class="botons">${v.font.drive_id
+      ? `<a class="btn btn-ple" href="https://drive.google.com/file/d/${v.font.drive_id}/view" target="_blank" rel="noopener">Obrir la fitxa oficial (PDF)</a>` : ''}</div>
     <p class="font">${esc(v.font.volum)} · BOPA núm. ${esc(v.font.bopa_num)}, ${esc(v.font.bopa_data)}, pàg. ${esc(v.font.bopa_pagina)}</p>
   </section>`
 }
@@ -196,37 +252,26 @@ function calculadoraHTML(v) {
       <p>Les àrees diferenciades en sòl no urbanitzable no tenen aprofitament privat. Si el Govern
          modifica la consideració d'afectació, l'àrea s'integra a la unitat d'actuació del mateix nom.</p>
       <div class="botons">${btnArt(8, 'Article 8 · Àrees diferenciades')}</div></section>`
-
-  if (!v.coeficient && !v.edificabilitat_max) return `
-    <section class="bloc"><h2>Quant es pot edificar</h2>
-      <p>Aquesta unitat no té coeficient d'edificabilitat: el volum edificable el determinen la
-         fitxa i els límits d'alçada. Consulta-ho al Comú.</p></section>`
+  if (!v.coeficient && !v.edificabilitat_max) return ''
 
   return `
   <section class="bloc">
     <h2>Calcula per a la teva parcel·la</h2>
-    ${v.edificabilitat_max
-      ? `<p>Aquesta unitat té l'edificabilitat assignada a la fitxa: <strong>${mil(v.edificabilitat_max)} m² de sostre</strong> per al conjunt de la unitat.</p>`
-      : `<p>El coeficient s'aplica sobre la <strong>parcel·la neta</strong>: la superfície un cop
-         descomptats els vials i els cursos d'aigua.</p>`}
+    <p>El coeficient s'aplica sobre la <strong>parcel·la neta</strong>: la superfície un cop
+       descomptats els vials i els cursos d'aigua.</p>
     <div class="calc-camps">
       <div><label for="sup">Superfície de la parcel·la (m²)</label>
         <input type="text" id="sup" inputmode="numeric" placeholder="480"></div>
       <div><label for="neta">Aquesta xifra…</label>
-        <select id="neta">
-          <option value="1">ja descompta vials i cursos d'aigua</option>
-          <option value="0">és la superfície total</option>
-        </select></div>
+        <select id="neta"><option value="1">ja descompta vials i cursos d'aigua</option>
+          <option value="0">és la superfície total</option></select></div>
     </div>
     <div id="sortida"></div>
     <label class="check"><input type="checkbox" id="bonif"> Es destina a habitatge, aparcament o
       ús agrícola o ramader (bonificació del 90% de l'impost)</label>
     <div class="nota nota-avis"><p><strong>Càlcul estimatiu.</strong> No té valor de llicència ni
-      de liquidació. Els imports definitius resulten de la resolució de la sol·licitud. La cessió
-      urbanística no es calcula aquí.</p></div>
+      de liquidació. Els imports definitius resulten de la resolució de la sol·licitud davant l'administració competent.</p></div>
     <div class="botons">${btnArt(18, 'Article 18 · Parcel·les')}</div>
-    <p class="font">Coeficient: Normes urbanístiques, ${esc(v.article_coef || 'articles 62 a 66')} ·
-       Impost sobre la construcció: ordinació tributària, article 59</p>
   </section>`
 }
 
@@ -240,7 +285,7 @@ function muntarCalculadora(v) {
     if (neta.value === '0') {
       out.innerHTML = `<div class="resultat"><p class="etiqueta">Falta una dada</p>
         <p class="com">El coeficient s'aplica sobre la parcel·la neta. Descompta la part de vials
-        i cursos d'aigua, o consulta-la al Comú.</p></div>`
+        i cursos d'aigua.</p></div>`
       return
     }
     let html = ''
@@ -250,9 +295,7 @@ function muntarCalculadora(v) {
         <p class="xifra">${mil(sostre)} m²</p>
         <p class="com">${mil(brut)} m² × ${String(v.coeficient).replace('.', ',')} m² sostre/m² sòl</p></div>`
       html += impostHTML(sostre, imp, bonif.checked)
-    } else if (v.edificabilitat_max) {
-      html += impostHTML(v.edificabilitat_max, imp, bonif.checked)
-    }
+    } else if (v.edificabilitat_max) html += impostHTML(v.edificabilitat_max, imp, bonif.checked)
     out.innerHTML = html
   }
   ;[sup, neta, bonif].forEach((el) => el.addEventListener('input', recalcular))
@@ -266,91 +309,86 @@ function impostHTML(sostre, imp, bonificat) {
     <p class="com">${mil(sostre)} m² × ${String(imp.index_localitzacio).replace('.', ',')} × ${String(imp.tipus).replace('.', ',')} €/m²${bonificat ? `, amb la bonificació del 90% sobre ${eur(quota)}` : ''}</p></div>`
 }
 
+function clausHTML(v) {
+  if (!v.claus.length) return ''
+  return `
+  <section class="bloc">
+    <h2>Les teves claus</h2>
+    <p>La zona determina quant pots edificar; la subzona, com.</p>
+    ${v.claus.map((c) => {
+      const amb = c.parametres.filter((x) => x.v && !/^Apartat/i.test(x.p))
+      return `<article class="targeta">
+        <p class="targeta-cap"><span class="xip xip-clau">${esc(c.clau)}</span>
+          <strong>${esc(c.denominacio || 'Clau no definida')}</strong>
+          <span class="meta">${esc(c.tipus)}</span></p>
+        ${c.coeficient ? `<p class="clau-coef">Coeficient màxim d'edificabilitat:
+          <strong>${esc(c.coeficient)} m² sostre/m² sòl</strong></p>` : ''}
+        ${c.subdivisions.length ? `<p class="meta">Es desglossa en ${c.subdivisions.map((s) =>
+          `${esc(s.codi)} ${esc(s.nom)}`).join(', ')}.</p>` : ''}
+        ${amb.length ? `<div class="graella">${amb.map((x) => `
+          <div class="dada"><span class="k">${esc(maj(x.p))}</span>
+            <span class="val">${x.n ? `<strong>${esc(x.n)} ${esc(x.u || '')}</strong>` : esc(entrada(x.v, 190))}
+            ${x.remet?.length ? `<span class="botons">${x.remet.map((n) => btnArt(n)).join('')}</span>` : ''}</span></div>`).join('')}</div>`
+          : '<p class="meta">Aquesta clau no fixa paràmetres numèrics propis.</p>'}
+        <div class="botons">${btnArt(String(c.article).replace(/\D/g, ''), 'Article de la clau')}</div>
+      </article>`
+    }).join('')}
+  </section>`
+}
+
+function condicionsHTML(v) {
+  const meus = v.apartats || []
+  const grups = GRUPS.map((g) => ({
+    nom: g.nom,
+    propis: meus.filter((a) => g.temes.includes(a.tema)),
+    arts: [...new Set((GENERALS || []).filter((a) => g.temes.includes(a.tema)).map((a) => a.num))].sort((a, b) => a - b),
+    gen: (GENERALS || []).filter((a) => g.temes.includes(a.tema)).length,
+  })).filter((g) => g.propis.length || g.gen)
+  if (!grups.length) return ''
+
+  return `
+  <section class="bloc">
+    <h2>Condicions constructives</h2>
+    <p>Les regles de les Normes urbanístiques que anomenen expressament les teves claus es mostren
+       senceres. La resta són d'aplicació general.</p>
+    ${grups.map((g) => `
+      <div class="grup">
+        <h3>${esc(g.nom)}</h3>
+        ${g.propis.length ? g.propis.map((a) => `
+          <article class="apartat">
+            <p class="ap-num">${esc(a.article)}.${esc(a.apartat)} · ${esc(a.titol)}
+              <span class="xip xip-clau">${a.claus.map(esc).join(' ')}</span></p>
+            ${paraf(a.text)}
+          </article>`).join('')
+          : `<p class="meta">Cap regla específica per a les teves claus.</p>`}
+        ${g.gen ? `<div class="general">
+          <p class="meta">${g.gen} condicion${g.gen > 1 ? 's' : ''} d'aplicació general en aquest àmbit.</p>
+          <div class="botons">${g.arts.map((n) => btnArt(n)).join('')}</div></div>` : ''}
+      </div>`).join('')}
+    <p class="font">POUPE Vol. II — Normes urbanístiques (Modificació 04) · BOPA núm. 135, 12/11/2025.
+       Els apartats s'assignen segons les claus que el seu text anomena expressament.</p>
+  </section>`
+}
+
 function patrimoniHTML(d) {
   if (!d.proteccions?.length) return ''
   const cats = [...new Set(d.proteccions.map((p) => p.categoria))]
   return `
   <section class="bloc" id="patrimoni">
     <h2>Patrimoni protegit</h2>
-    <p>Aquest àmbit té béns o espais catalogats. Segons la categoria, això comporta obligacions
-       abans de projectar cap actuació.</p>
     ${cats.map((c) => {
       const items = d.proteccions.filter((p) => p.categoria === c)
-      return `<div class="cat-prot">
-        <p class="cat">${esc(c)}</p>
-        ${items[0].obligacio ? `<p class="obligacio">${esc(items[0].obligacio)}</p>` : ''}
-        <div class="botons">${items.map((p, i) =>
-          `<details class="be"><summary>${esc(p.nom)}</summary>
-            <div class="be-cos"><dl class="dades">
-              <dt>Categoria</dt><dd>${esc(p.categoria)}${p.tipus ? ' · ' + esc(p.tipus) : ''}</dd>
-              <dt>Adreça</dt><dd>${esc(p.adreca || '—')}</dd>
-            </dl></div></details>`).join('')}</div>
-        <div class="botons">${btnArt(83, 'Article 83 · Béns culturals parroquials')}
-          ${btnArt(84, 'Article 84 · BIC i espais de presumpció arqueològica')}</div>
+      return `<div class="grup">
+        <h3>${esc(maj(c.toLowerCase()))}</h3>
+        ${items[0].obligacio ? `<p class="obligacio">${esc(maj(items[0].obligacio))}</p>` : ''}
+        <div class="graella">${items.map((p) => `
+          <div class="dada"><span class="k">${esc(maj((p.tipus || 'Bé').toLowerCase()))}</span>
+            <span class="val">${esc(p.nom)}${p.adreca ? `<br><span class="meta">${esc(p.adreca)}</span>` : ''}</span></div>`).join('')}</div>
+        <div class="botons">${btnArt(83, 'Article 83')} ${btnArt(84, 'Article 84')}</div>
       </div>`
     }).join('')}
     <p class="font">POUPE Vol. IX — Catàleg comunal d'edificis, espais i elements d'interès
        històric, monumental i cultural · BOPA núm. 62, 2/6/2021</p>
-  </section>`
-}
-
-function condicionsHTML(v) {
-  const meus = v.apartats || []
-  const temes = (CONFIG.temes || []).filter((t) =>
-    meus.some((a) => a.tema === t) || (GENERALS || []).some((a) => a.tema === t))
-  if (!temes.length) return ''
-
-  return `
-  <section class="bloc">
-    <h2>Condicions constructives</h2>
-    <p>Les regles de les Normes urbanístiques que anomenen expressament les teves claus. La resta
-       de condicions s'apliquen a tothom i les tens a l'article complet.</p>
-    ${temes.map((t) => {
-      const propis = meus.filter((a) => a.tema === t)
-      const gen = (GENERALS || []).filter((a) => a.tema === t)
-      const arts = [...new Set([...propis, ...gen].map((a) => a.num))].sort((a, b) => a - b)
-      return `
-      <div class="tema">
-        <p class="cat">${esc(t[0].toUpperCase() + t.slice(1))}</p>
-        ${propis.length ? propis.map((a) => `
-          <div class="apartat">
-            <p class="ap-num">${esc(a.article)}.${esc(a.apartat)}
-              <span class="xip xip-clau">${a.claus.map(esc).join(' ')}</span></p>
-            <p>${esc(entrada(a.text))}</p>
-            <div class="botons">${btnArt(a.num, 'Veure l\'article sencer')}</div>
-          </div>`).join('')
-          : `<p class="meta">Cap regla específica per a les teves claus.</p>`}
-        ${gen.length ? `<p class="meta">${gen.length} condicion${gen.length > 1 ? 's' : ''} més
-          d'aplicació general.</p>
-          <div class="botons">${arts.map((n) => btnArt(n)).join('')}</div>` : ''}
-      </div>`
-    }).join('')}
-    <p class="font">POUPE Vol. II — Normes urbanístiques (Modificació 04) · BOPA núm. 135,
-       12/11/2025. Els apartats es mostren segons les claus que el seu text anomena expressament.</p>
-  </section>`
-}
-
-function clausHTML(v) {
-  if (!v.claus.length) return ''
-  return `
-  <section class="bloc">
-    <h2>Les teves claus</h2>
-    ${v.claus.map((c) => {
-      const amb = c.parametres.filter((x) => x.n || (x.v && !/^Apartat/i.test(x.p)))
-      return `<div class="clau">
-        <p class="cat"><span class="xip xip-clau">${esc(c.clau)}</span> ${esc(c.denominacio || 'clau no definida')}
-          <span class="meta">· ${esc(c.tipus)}</span></p>
-        ${c.coeficient ? `<p>Coeficient màxim d'edificabilitat: <strong>${esc(c.coeficient)} m² sostre/m² sòl</strong>.</p>` : ''}
-        ${c.subdivisions.length ? `<p class="meta">Es desglossa en ${c.subdivisions.map((s) =>
-          `${esc(s.codi)} ${esc(s.nom)}`).join(', ')}.</p>` : ''}
-        ${amb.length ? `<dl class="dades">${amb.map((x) => `
-          <dt>${esc(x.p)}</dt>
-          <dd>${x.n ? `<strong>${esc(x.n)} ${esc(x.u || '')}</strong>` : esc(entrada(x.v, 200))}
-            ${x.remet?.length ? `<div class="botons">${x.remet.map((n) => btnArt(n)).join('')}</div>` : ''}</dd>`).join('')}</dl>`
-          : '<p class="meta">Aquesta clau no fixa paràmetres numèrics propis.</p>'}
-        <div class="botons">${c.article ? btnArt(String(c.article).replace(/\D/g, ''), 'Article complet de la clau') : ''}</div>
-      </div>`
-    }).join('')}
   </section>`
 }
 
@@ -372,51 +410,67 @@ function historicHTML(d) {
   <section class="bloc">
     <h2>Històric de modificacions</h2>
     <p class="meta">Preval sempre la darrera modificació. Les anteriors es conserven a efectes de consulta.</p>
-    <ul class="hist">
-      ${d.historic.map((h) => `<li>
-        <div><strong>${esc(h.modificacio)}</strong>${h.vigent ? ' · vigent' : ''}
-          <span class="meta"><br>${esc(h.fase || '')} · BOPA núm. ${esc(h.bopa_num)}, ${esc(h.bopa_data)}</span></div>
-        ${h.drive_id ? `<a class="btn btn-petit" href="https://drive.google.com/file/d/${h.drive_id}/view" target="_blank" rel="noopener">PDF</a>` : ''}
-      </li>`).join('')}
-    </ul>
+    <ul class="hist">${d.historic.map((h) => `<li>
+      <div><strong>${esc(h.modificacio)}</strong>${h.vigent ? ' · vigent' : ''}
+        <span class="meta"><br>${esc(h.fase || '')} · BOPA núm. ${esc(h.bopa_num)}, ${esc(h.bopa_data)}</span></div>
+      ${h.drive_id ? `<a class="btn btn-petit" href="https://drive.google.com/file/d/${h.drive_id}/view" target="_blank" rel="noopener">PDF</a>` : ''}
+    </li>`).join('')}</ul>
   </section>`
 }
 
-// ---------- pàgines generals ----------
 async function pagina(nom) {
   const cont = $('#pagina')
   $('#cerca').hidden = true; cont.hidden = false
+  CLAUS_ARA = []
   let h = ''
   if (nom === 'glossari') {
     const g = await fetch('data/glossari.json').then((r) => r.json())
-    h = `<h1>Glossari</h1>${g.map((t) => `<div class="terme">
-      <p class="cat">${esc(t.terme)}</p><p>${esc(t.definicio_planera)}</p>
-      <p class="font">${esc(t.font)}${t.article ? ', ' + esc(t.article) : ''}</p></div>`).join('')}`
+    h = `<h1>Glossari</h1>${g.map((t) => `<article class="targeta">
+      <p class="targeta-cap"><strong>${esc(t.terme)}</strong></p><p>${esc(maj(t.definicio_planera))}</p>
+      <p class="font">${esc(t.font)}${t.article ? ', ' + esc(t.article) : ''}</p></article>`).join('')}`
   } else if (nom === 'claus') {
     const c = await fetch('data/claus.json').then((r) => r.json())
-    h = `<h1>Claus urbanístiques</h1><dl class="dades">${c.map((x) => `
-      <dt class="xip-clau">${esc(x.clau)}</dt>
-      <dd>${esc(x.denominacio)}${x.coef_edificabilitat ? ` · coeficient ${esc(x.coef_edificabilitat)}` : ''}
-        <div class="botons">${btnArt(String(x.article).replace(/\D/g, ''))}</div></dd>`).join('')}</dl>`
+    h = `<h1>Claus urbanístiques</h1><div class="graella">${c.map((x) => `
+      <div class="dada"><span class="k"><span class="xip xip-clau">${esc(x.clau)}</span></span>
+        <span class="val">${esc(x.denominacio)}${x.coef_edificabilitat ? ` · coeficient ${esc(x.coef_edificabilitat)}` : ''}
+          <span class="botons">${btnArt(String(x.article).replace(/\D/g, ''))}</span></span></div>`).join('')}</div>`
   } else if (nom === 'normativa') {
     if (!ARTICLES) ARTICLES = await fetch('data/articles.json').then((r) => r.json())
     const nums = Object.keys(ARTICLES).map(Number).sort((a, b) => a - b)
     h = `<h1>Normes urbanístiques</h1>
-      <p class="entrada">POUPE Volum II, Modificació 04. Publicades al BOPA núm. 135 de 12/11/2025.</p>
+      <p class="entrada">POUPE Volum II, Modificació 04. BOPA núm. 135 de 12/11/2025.</p>
       <ul class="llista-art">${nums.map((n) => `<li>
-        <span><strong>Article ${n}</strong> · ${esc(ARTICLES[n].titol)}</span>
-        ${btnArt(n, 'Obrir')}</li>`).join('')}</ul>`
+        <span><strong>Article ${n}</strong> · ${esc(ARTICLES[n].titol)}</span>${btnArt(n, 'Obrir')}</li>`).join('')}</ul>`
+  } else if (nom === 'sobre') {
+    h = `<h1>Sobre aquest projecte</h1>
+      <p class="entrada">Aquesta web és un projecte de consulta del Pla d'Ordenació i Urbanisme de
+         la Parròquia d'Encamp, revisió 2019. No és un servei oficial ni substitueix cap tràmit.</p>
+      <article class="targeta"><p class="targeta-cap"><strong>D'on surt la informació</strong></p>
+        <p>De les fitxes urbanístiques i les Normes urbanístiques publicades al Butlletí Oficial del
+           Principat d'Andorra. Cada dada indica el volum, el número de butlletí, la data i la pàgina
+           d'on prové, i des de cada fitxa es pot obrir el PDF original.</p></article>
+      <article class="targeta"><p class="targeta-cap"><strong>Com s'ha construït</strong></p>
+        <p>Les fitxes són imatges dins dels PDF publicats i s'han transcrit amb reconeixement òptic
+           de caràcters. Les Normes urbanístiques sí que tenen text i s'han extret literalment. Les
+           unitats amb dades que encara no s'han pogut comprovar es mostren amb un avís.</p></article>
+      <article class="targeta"><p class="targeta-cap"><strong>Què no fa</strong></p>
+        <p>No emet certificats ni resol consultes urbanístiques. Els càlculs d'edificabilitat i
+           d'impost són orientatius: apliquen la norma publicada a una superfície introduïda per
+           l'usuari, i el resultat definitiu depèn de la resolució de cada expedient. La cessió
+           urbanística no es calcula.</p></article>
+      <p class="font">En cas de discrepància preval sempre el text publicat al BOPA.</p>`
   } else if (nom === 'preguntes') {
     const r = await fetch('data/regles.json').then((res) => res.json())
     h = `<h1>Preguntes freqüents</h1>${r
       .filter((x) => x.estat !== 'NO CALCULABLE' && x.nom && !String(x.id_regla).startsWith('PARAM'))
-      .map((x) => `<div class="terme"><p class="cat">${esc(x.nom)}</p><p>${esc(x.formula)}</p>
-        ${x.observacions ? `<p class="meta">${esc(x.observacions)}</p>` : ''}
-        <p class="font">${esc(x.font)}, ${esc(x.article)}</p></div>`).join('')}`
+      .map((x) => `<article class="targeta"><p class="targeta-cap"><strong>${esc(x.nom)}</strong></p>
+        <p>${esc(maj(x.formula))}</p>${x.observacions ? `<p class="meta">${esc(x.observacions)}</p>` : ''}
+        <p class="font">${esc(x.font)}, ${esc(x.article)}</p></article>`).join('')}`
   }
   cont.innerHTML = `<div class="cont">${h}</div>`
   lligaBotons(cont)
   window.scrollTo(0, 0)
 }
 
+window.tancaCalaix = tancaCalaix
 inici()

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Consulta urbanística · POUPE 2019 · Comú d'Encamp</title>
-<meta name="description" content="Consulta el règim urbanístic de la teva unitat d'actuació a la parròquia d'Encamp.">
+<title>Consulta del POUPE 2019 · Encamp</title>
+<meta name="description" content="Projecte de consulta del Pla d'Ordenació i Urbanisme de la Parròquia d'Encamp, revisió 2019.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
@@ -15,8 +15,8 @@
 <header class="barra">
   <div class="barra-in">
     <a class="marca" href="#" id="marca">
-      <span class="marca-com">Comú d'Encamp</span>
-      <span class="marca-tit">Consulta urbanística</span>
+      <span class="marca-com">Projecte de consulta</span>
+      <span class="marca-tit">POUPE 2019 · Encamp</span>
     </a>
     <button class="hamb" id="hamb" aria-label="Menú" aria-expanded="false">
       <span></span><span></span><span></span>
@@ -28,6 +28,7 @@
     <a href="#claus">Claus urbanístiques</a>
     <a href="#normativa">Normes urbanístiques</a>
     <a href="#preguntes">Preguntes freqüents</a>
+    <a href="#sobre">Sobre aquest projecte</a>
   </nav>
 </header>
 
@@ -35,9 +36,10 @@
 
   <section class="cerca" id="cerca">
     <div class="cont">
-      <h1>Què puc fer al meu terreny?</h1>
+      <h1>Què diu el POUPE del meu terreny?</h1>
       <p class="entrada">Consulta la fitxa urbanística de qualsevol unitat d'actuació de la
-         parròquia d'Encamp: què s'hi pot construir, quines proteccions hi ha i quins tràmits calen.</p>
+         parròquia d'Encamp: què s'hi pot construir, quines proteccions hi ha i quines condicions
+         constructives s'hi apliquen.</p>
 
       <label for="q">Busca per nom</label>
       <input type="search" id="q" autocomplete="off" spellcheck="false"
@@ -47,8 +49,9 @@
       <label for="tria" class="sep">O tria-la de la llista</label>
       <select id="tria"><option value="">Selecciona una unitat d'actuació…</option></select>
 
-      <p class="peu-nota">La informació prové del text publicat al Butlletí Oficial del Principat
-         d'Andorra. En cas de discrepància preval el text publicat al BOPA.</p>
+      <p class="peu-nota">Projecte de consulta sense caràcter oficial. La informació prové del text
+         publicat al Butlletí Oficial del Principat d'Andorra; en cas de discrepància preval el text
+         del BOPA.</p>
     </div>
   </section>
 
@@ -59,8 +62,8 @@
 
 <footer class="peu">
   <div class="cont">
-    <p>Servei d'informació del Comú d'Encamp. Les xifres calculades són orientatives i no tenen
-       valor de llicència ni de liquidació.</p>
+    <p>Projecte de consulta del POUPE 2019. No és un servei oficial: les xifres calculades són
+       orientatives i no tenen valor de llicència ni de liquidació.</p>
     <p class="generat" id="generat"></p>
   </div>
 </footer>

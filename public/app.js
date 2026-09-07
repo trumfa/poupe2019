@@ -103,8 +103,8 @@ function fitxaHTML(d, v) {
         ${v.descripcio ? `<p>${esc(v.descripcio)}</p>` : ''}
     ${v.planol ? `<figure class="planol">
       <img src="https://drive.google.com/thumbnail?id=${esc(v.planol)}&sz=w1200"
-           alt="Plànol de situació de ${esc(d.nom)}" loading="lazy">
-      <figcaption>Plànol de la fitxa. Per a la delimitació exacta, consulta els plànols d'ordenació.</figcaption>
+           alt="Fitxa urbanística de ${esc(d.nom)}" loading="lazy">
+            <figcaption>Fitxa publicada al BOPA. Per a la delimitació exacta, consulta els plànols d'ordenació.</figcaption>
     </figure>` : ''}
     <dl class="dades">${dades.map(([k, val]) => `<dt>${k}</dt><dd>${val}</dd>`).join('')}</dl>
     ${v.usos ? `<p style="margin-top:1rem">${esc(v.usos)}</p>` : ''}

@@ -25,6 +25,7 @@ function parseCSV(text) {
     else if (c !== '\r') camp += c
   }
   if (camp || fila.length) { fila.push(camp); files.push(fila) }
+    if (!files.length) return []
   const caps = files.shift().map((h) => h.trim())
   return files
     .filter((f) => f.some((v) => v.trim()))

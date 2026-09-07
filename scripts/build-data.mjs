@@ -7,6 +7,12 @@ import { writeFile, mkdir, rm } from 'node:fs/promises'
 const FULL = '1lOE1ahkudXNJS8tix0RBt0_RywUHxiJITqpmcSdkkls'
 const OUT = 'public/data'
 
+// Temes que es mostren a la fitxa d'una unitat. La resta (llicències, sistemes,
+// cessions, classificació) tenen el seu propi lloc a la web.
+const TEMES_FITXA = ['parcel·la i separacions', 'dimensions', 'alçades', 'volums i cossos volats',
+  'cobertes', 'façanes i acabats', 'obertures', 'moviments de terra', 'edificacions auxiliars',
+  'superfícies', 'aparcament', 'usos', 'construcció i habitabilitat', 'obres provisionals']
+
 const url = (tab) =>
   `https://docs.google.com/spreadsheets/d/${FULL}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`
 
@@ -67,16 +73,19 @@ const claus = (s) =>
     .map((m) => ({ nom: m[1].trim(), clau: m[2].trim() }))
 
 console.log('Baixant el full de càlcul…')
-const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv, planols, prot, normativa] =
+const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv, planols, prot, apartats] =
   await Promise.all(['UA', 'Fitxes', 'Parametres', 'Claus', 'Claus_parametres',
     'Glossari', 'Regles_calcul', 'Tributs', 'Claus_subdivisions', 'Planols',
-    'Proteccions', 'Normativa'].map(pestanya))
+    'Proteccions', 'Normativa_apartats'].map(pestanya))
 
-const artPerNum = {}
-for (const a of normativa) {
-  const n = String(a.article || '').match(/(\d+)/)
-  if (n) artPerNum[n[1]] = a
-}
+const ap = apartats.map((a) => ({
+  id: a.id, article: a.article, apartat: a.apartat, titol: a.titol_article,
+  tema: a.tema, text: a.text, abast: a.abast,
+  claus: String(a.claus_aplicables || '').split(';').map((s) => s.trim().toUpperCase()).filter(Boolean),
+})).filter((a) => a.text)
+
+const apEspecifics = ap.filter((a) => a.abast !== 'general' && TEMES_FITXA.includes(a.tema))
+const apGenerals = ap.filter((a) => a.abast === 'general' && TEMES_FITXA.includes(a.tema))
 
 const planolPerFitxa = Object.fromEntries(planols.map((p) => [p.id_fitxa, p.drive_id_imatge]))
 const fitxaPerId = Object.fromEntries(fitxes.map((f) => [f.id_fitxa, f]))
@@ -112,6 +121,7 @@ for (const u of ua) {
   const versions = vigents.map((p) => {
     const zones = claus(p.zones), subzones = claus(p.subzones)
     const totes = [...zones, ...subzones].map((z) => z.clau)
+    const meves_claus = new Set(totes.map((c) => c.toUpperCase()))
     const coef = zones.map((z) => num(clau(z.clau)?.coef_edificabilitat)).filter(Boolean)
 
     return {
@@ -148,17 +158,16 @@ for (const u of ua) {
           tipus: clau(c)?.tipus || '',
           article: clau(c)?.article || '',
           parametres: paramsDeClau(c)
-            .map((x) => ({ p: x.parametre, v: x.valor, n: x.valor_numeric, u: x.unitat, remet: x.remet_a })),
+            .map((x) => ({ p: x.parametre, v: x.valor, n: x.valor_numeric, u: x.unitat })),
           subdivisions: subdivDeClau(c).map((s) => ({ codi: s.codi, nom: s.denominacio })),
-          remissions: [...new Set(paramsDeClau(c).flatMap((x) =>
-            String(x.remet_a || '').split(';').map((s) => s.trim()).filter(Boolean)))]
-            .sort((a, b) => a - b)
-            .map((n) => artPerNum[n]
-              ? { num: n, titol: artPerNum[n].titol || '', text: artPerNum[n].text || '' }
-              : null)
-            .filter(Boolean),
         }
       }),
+      // apartats de les Normes que anomenen alguna de les claus d'aquesta unitat
+      apartats: apEspecifics
+        .filter((a) => a.claus.some((c) => meves_claus.has(c)))
+        .map((a) => ({ id: a.id, article: a.article, apartat: a.apartat, titol: a.titol,
+                       tema: a.tema, text: a.text, abast: a.abast,
+                       claus: a.claus.filter((c) => meves_claus.has(c)) })),
       font: {
         volum: `POUPE Vol. ${p.volum}`,
         bopa_num: p.bopa_num, bopa_data: p.bopa_data, bopa_pagina: p.bopa_pagina,
@@ -174,10 +183,8 @@ for (const u of ua) {
   })).sort((a, b) => a.modificacio.localeCompare(b.modificacio))
 
   const proteccions = prot.filter((p) => p.id_ua === id)
-    .map((p) => ({
-      nom: p.nom, categoria: p.categoria, tipus: p.tipus,
-      adreca: p.adreca, obligacio: p.obligacio, article: p.article,
-    }))
+    .map((p) => ({ nom: p.nom, categoria: p.categoria, tipus: p.tipus,
+                   adreca: p.adreca, obligacio: p.obligacio, article: p.article }))
 
   await writeFile(`${OUT}/ua/${id}.json`,
     JSON.stringify({ id, nom: u.nom_oficial, versions, historic, proteccions }, null, 0))
@@ -197,18 +204,24 @@ await writeFile(`${OUT}/index.json`, JSON.stringify(index))
 await writeFile(`${OUT}/glossari.json`, JSON.stringify(glossari))
 await writeFile(`${OUT}/claus.json`, JSON.stringify(cls))
 await writeFile(`${OUT}/proteccions.json`, JSON.stringify(prot))
+await writeFile(`${OUT}/apartats-generals.json`, JSON.stringify(
+  apGenerals.map((a) => ({ id: a.id, article: a.article, apartat: a.apartat,
+                           titol: a.titol, tema: a.tema, text: a.text }))))
 await writeFile(`${OUT}/normativa.json`, JSON.stringify(
-  normativa.map((a) => ({ article: a.article, titol: a.titol, text: a.text, font: a.font }))))
+  ap.map((a) => ({ id: a.id, article: a.article, apartat: a.apartat, titol: a.titol,
+                   tema: a.tema, text: a.text, abast: a.abast, claus: a.claus }))))
 await writeFile(`${OUT}/regles.json`, JSON.stringify(
   regles.filter((r) => r.estat !== 'PENDENT DE REDACTAR')))
 await writeFile(`${OUT}/config.json`, JSON.stringify({
   generat: new Date().toISOString().slice(0, 10),
+  temes: TEMES_FITXA,
   impost_construccio: { tipus: 48.18, index_localitzacio: 1.37, article: 'Art. 59', bonificacio: 0.9 },
   tributs,
 }))
 
 console.log(`\n${index.length} unitats generades a ${OUT}`)
 console.log(`${index.filter((i) => i.revisar).length} amb dades pendents de revisió`)
-console.log(`${planols.length} plànols · ${prot.length} béns protegits · ${normativa.length} articles`)
+console.log(`${planols.length} plànols · ${prot.length} béns protegits`)
+console.log(`${ap.length} apartats normatius: ${apEspecifics.length} específics i ${apGenerals.length} generals a la fitxa`)
 if (!tributs.length) console.log('AVÍS: la pestanya Tributs és buida.')
 if (senseClau.size) console.log(`Claus sense definició al Volum II: ${[...senseClau].join(', ')}`)

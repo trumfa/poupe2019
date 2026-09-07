@@ -1,0 +1,31 @@
+name: Actualitza les dades del POUPE
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * 1'
+
+permissions:
+  contents: write
+
+jobs:
+  dades:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Generar els JSON
+        run: node scripts/build-data.mjs
+      - name: Publicar els canvis
+        run: |
+          git config user.name "Actualització automàtica"
+          git config user.email "actions@github.com"
+          git add public/data
+          if git diff --staged --quiet; then
+            echo "Cap canvi a les dades"
+          else
+            git commit -m "Actualització de dades del POUPE"
+            git push
+          fi

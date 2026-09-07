@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consulta urbanística · POUPE 2019 · Comú d'Encamp</title>
+<meta name="description" content="Consulta el règim urbanístic de la teva unitat d'actuació a la parròquia d'Encamp.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="barra">
+  <div class="barra-in">
+    <a class="marca" href="#" id="marca">
+      <span class="marca-com">Comú d'Encamp</span>
+      <span class="marca-tit">Consulta urbanística</span>
+    </a>
+    <button class="hamb" id="hamb" aria-label="Menú" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <nav class="menu" id="menu" hidden>
+    <a href="#">Nova consulta</a>
+    <a href="#glossari">Glossari de termes</a>
+    <a href="#claus">Claus urbanístiques</a>
+    <a href="#normativa">Normes urbanístiques</a>
+    <a href="#preguntes">Preguntes freqüents</a>
+  </nav>
+</header>
+
+<main id="principal">
+
+  <section class="cerca" id="cerca">
+    <div class="cont">
+      <h1>Què puc fer al meu terreny?</h1>
+      <p class="entrada">Consulta la fitxa urbanística de qualsevol unitat d'actuació de la
+         parròquia d'Encamp: què s'hi pot construir, quines proteccions hi ha i quins tràmits calen.</p>
+
+      <label for="q">Busca per nom</label>
+      <input type="search" id="q" autocomplete="off" spellcheck="false"
+             placeholder="Escriu el nom de la unitat o la referència cadastral">
+      <ul class="resultats" id="resultats"></ul>
+
+      <label for="tria" class="sep">O tria-la de la llista</label>
+      <select id="tria"><option value="">Selecciona una unitat d'actuació…</option></select>
+
+      <p class="peu-nota">La informació prové del text publicat al Butlletí Oficial del Principat
+         d'Andorra. En cas de discrepància preval el text publicat al BOPA.</p>
+    </div>
+  </section>
+
+  <section id="detall" hidden></section>
+  <section id="pagina" hidden></section>
+
+</main>
+
+<footer class="peu">
+  <div class="cont">
+    <p>Servei d'informació del Comú d'Encamp. Les xifres calculades són orientatives i no tenen
+       valor de llicència ni de liquidació.</p>
+    <p class="generat" id="generat"></p>
+  </div>
+</footer>
+
+<div class="calaix-fons" id="calaix-fons" hidden></div>
+<aside class="calaix" id="calaix" hidden aria-label="Text de l'article">
+  <div class="calaix-cap">
+    <p id="calaix-titol"></p>
+    <button id="calaix-tanca" aria-label="Tanca">×</button>
+  </div>
+  <div class="calaix-cos" id="calaix-cos"></div>
+</aside>
+
+<script src="app.js"></script>
+</body>
+</html>

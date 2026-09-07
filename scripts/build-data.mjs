@@ -69,7 +69,7 @@ const claus = (s) =>
 console.log('Baixant el full de càlcul…')
 const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv, planols] =
   await Promise.all(['UA', 'Fitxes', 'Parametres', 'Claus', 'Claus_parametres',
-    'Glossari', 'Regles_calcul', 'Tributs', 'Claus_subdivisions', 'Planols'].map(pestanya))
+    'Glossari', 'Regles_calcul', 'Tributs', 'Claus_subdivisions', 'Planols', 'Proteccions'].map(pestanya))
 
 const planolPerFitxa = Object.fromEntries(planols.map((p) => [p.id_fitxa, p.drive_id_imatge]))
 const fitxaPerId = Object.fromEntries(fitxes.map((f) => [f.id_fitxa, f]))
@@ -155,8 +155,11 @@ for (const u of ua) {
     fase: f.fase_aprovacio, drive_id: f.drive_id,
   })).sort((a, b) => a.modificacio.localeCompare(b.modificacio))
 
+    const proteccions = prot.filter((p) => p.id_ua === id)
+    .map((p) => ({ nom: p.nom, categoria: p.categoria, tipus: p.tipus,
+                   adreca: p.adreca, obligacio: p.obligacio, article: p.article }))
   await writeFile(`${OUT}/ua/${id}.json`,
-    JSON.stringify({ id, nom: u.nom_oficial, versions, historic }, null, 0))
+    JSON.stringify({ id, nom: u.nom_oficial, versions, historic, proteccions }, null, 0))
 
   index.push({
     id, nom: u.nom_oficial, norm: norm(u.nom_oficial),

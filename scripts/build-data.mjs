@@ -25,7 +25,7 @@ function parseCSV(text) {
     else if (c !== '\r') camp += c
   }
   if (camp || fila.length) { fila.push(camp); files.push(fila) }
-    if (!files.length) return []
+  if (!files.length) return []
   const caps = files.shift().map((h) => h.trim())
   return files
     .filter((f) => f.some((v) => v.trim()))
@@ -49,6 +49,19 @@ const num = (s) => {
   return Number.isFinite(n) ? n : null
 }
 
+// Descarta els fragments que són restes del plànol llegides com a text per l'OCR.
+const net = (s) => String(s || '')
+  .split(/(?<=\.)\s+/)
+  .filter((f) => {
+    const t = f.trim()
+    if (t.length < 8) return true
+    const lletres = (t.match(/[a-zà-úA-ZÀ-Ú]/g) || []).length
+    const paraules = t.split(/\s+/)
+    const curtes = paraules.filter((p) => p.length <= 3).length
+    return lletres / t.length > 0.62 && curtes / paraules.length < 0.6
+  })
+  .join(' ').replace(/\s+/g, ' ').trim()
+
 const claus = (s) =>
   [...String(s || '').matchAll(/([^;]+?)\s*\(Clau\s*([^)]+)\)/g)]
     .map((m) => ({ nom: m[1].trim(), clau: m[2].trim() }))
@@ -59,10 +72,21 @@ const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv, pla
     'Glossari', 'Regles_calcul', 'Tributs', 'Claus_subdivisions', 'Planols'].map(pestanya))
 
 const planolPerFitxa = Object.fromEntries(planols.map((p) => [p.id_fitxa, p.drive_id_imatge]))
-
 const fitxaPerId = Object.fromEntries(fitxes.map((f) => [f.id_fitxa, f]))
 const uaDeFitxa = (p) => p.id_ua || fitxaPerId[p.id_fitxa]?.id_ua || ''
-const clauPerCodi = Object.fromEntries(cls.map((c) => [c.clau, c]))
+
+// Les fitxes escriuen 8b i 6a; el Volum II defineix 8B i 6A. Indexem per totes dues formes.
+const clauPerCodi = {}
+for (const c of cls) {
+  clauPerCodi[c.clau] = c
+  clauPerCodi[c.clau.toUpperCase()] = c
+}
+const clau = (c) => clauPerCodi[c] || clauPerCodi[String(c).toUpperCase()] || null
+
+const paramsDeClau = (c) => clsParam.filter((x) =>
+  String(x.clau).toUpperCase() === String(c).toUpperCase())
+const subdivDeClau = (c) => subdiv.filter((s) =>
+  String(s.clau_mare).toUpperCase() === String(c).toUpperCase())
 
 await rm(OUT, { recursive: true, force: true })
 await mkdir(`${OUT}/ua`, { recursive: true })
@@ -80,8 +104,7 @@ for (const u of ua) {
   const versions = vigents.map((p) => {
     const zones = claus(p.zones), subzones = claus(p.subzones)
     const totes = [...zones, ...subzones].map((z) => z.clau)
-    const coef = zones.map((z) => num(clauPerCodi[z.clau]?.coef_edificabilitat))
-      .filter(Boolean)
+    const coef = zones.map((z) => num(clau(z.clau)?.coef_edificabilitat)).filter(Boolean)
 
     return {
       id_fitxa: p.id_fitxa,
@@ -98,12 +121,12 @@ for (const u of ua) {
       front_minim: p.front_minim_m,
       zones, subzones,
       coeficient: coef.length ? Math.max(...coef) : null,
-      article_coef: zones.map((z) => clauPerCodi[z.clau]?.article).filter(Boolean)[0] || '',
+      article_coef: zones.map((z) => clau(z.clau)?.article).filter(Boolean)[0] || '',
       alcades: p.alcades,
-      descripcio: p.descripcio,
-      ordenacio: p.ordenacio,
-      usos: p.usos,
-      gestio: p.gestio,
+      descripcio: net(p.descripcio),
+      ordenacio: net(p.ordenacio),
+      usos: net(p.usos),
+      gestio: net(p.gestio),
       planol: planolPerFitxa[p.id_fitxa] || '',
       cobertura: p.cobertura,
       revisar: p.revisar,
@@ -111,13 +134,12 @@ for (const u of ua) {
       compartit_amb: p.compartit_amb,
       claus: [...new Set(totes)].map((c) => ({
         clau: c,
-        denominacio: clauPerCodi[c]?.denominacio || '',
-        tipus: clauPerCodi[c]?.tipus || '',
-        article: clauPerCodi[c]?.article || '',
-        parametres: clsParam.filter((x) => x.clau === c)
+        denominacio: clau(c)?.denominacio || '',
+        tipus: clau(c)?.tipus || '',
+        article: clau(c)?.article || '',
+        parametres: paramsDeClau(c)
           .map((x) => ({ p: x.parametre, v: x.valor, n: x.valor_numeric, u: x.unitat, remet: x.remet_a })),
-        subdivisions: subdiv.filter((s) => s.clau_mare === c)
-          .map((s) => ({ codi: s.codi, nom: s.denominacio })),
+        subdivisions: subdivDeClau(c).map((s) => ({ codi: s.codi, nom: s.denominacio })),
       })),
       font: {
         volum: `POUPE Vol. ${p.volum}`,
@@ -146,8 +168,6 @@ for (const u of ua) {
 
 index.sort((a, b) => a.nom.localeCompare(b.nom, 'ca'))
 
-const tribut = (id) => tributs.find((t) => t.id_tribut === id) || {}
-
 await writeFile(`${OUT}/index.json`, JSON.stringify(index))
 await writeFile(`${OUT}/glossari.json`, JSON.stringify(glossari))
 await writeFile(`${OUT}/claus.json`, JSON.stringify(cls))
@@ -156,8 +176,16 @@ await writeFile(`${OUT}/regles.json`, JSON.stringify(
 await writeFile(`${OUT}/config.json`, JSON.stringify({
   generat: new Date().toISOString().slice(0, 10),
   impost_construccio: { tipus: 48.18, index_localitzacio: 1.37, article: 'Art. 59', bonificacio: 0.9 },
-  tributs: tributs.filter((t) => t.any === String(new Date().getFullYear()) || t.any),
+  tributs,
 }))
+
+const senseClau = new Set()
+for (const u of index) {
+  const d = JSON.parse(await import('node:fs/promises').then((f) => f.readFile(`${OUT}/ua/${u.id}.json`, 'utf8')))
+  for (const v of d.versions) for (const c of v.claus) if (!c.denominacio) senseClau.add(c.clau)
+}
 
 console.log(`\n${index.length} unitats generades a ${OUT}`)
 console.log(`${index.filter((i) => i.revisar).length} amb dades pendents de revisió`)
+console.log(`${planols.length} plànols enllaçats`)
+if (senseClau.size) console.log(`Claus sense definició al Volum II: ${[...senseClau].join(', ')}`)

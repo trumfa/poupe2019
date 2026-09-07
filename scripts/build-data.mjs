@@ -67,9 +67,10 @@ const claus = (s) =>
     .map((m) => ({ nom: m[1].trim(), clau: m[2].trim() }))
 
 console.log('Baixant el full de càlcul…')
-const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv, planols] =
+const [ua, fitxes, params, cls, clsParam, glossari, regles, tributs, subdiv, planols, prot] =
   await Promise.all(['UA', 'Fitxes', 'Parametres', 'Claus', 'Claus_parametres',
-    'Glossari', 'Regles_calcul', 'Tributs', 'Claus_subdivisions', 'Planols', 'Proteccions'].map(pestanya))
+    'Glossari', 'Regles_calcul', 'Tributs', 'Claus_subdivisions', 'Planols',
+    'Proteccions'].map(pestanya))
 
 const planolPerFitxa = Object.fromEntries(planols.map((p) => [p.id_fitxa, p.drive_id_imatge]))
 const fitxaPerId = Object.fromEntries(fitxes.map((f) => [f.id_fitxa, f]))
@@ -92,6 +93,7 @@ await rm(OUT, { recursive: true, force: true })
 await mkdir(`${OUT}/ua`, { recursive: true })
 
 const index = []
+const senseClau = new Set()
 
 for (const u of ua) {
   const id = u.id_ua
@@ -132,15 +134,18 @@ for (const u of ua) {
       revisar: p.revisar,
       compartit: p.compartit,
       compartit_amb: p.compartit_amb,
-      claus: [...new Set(totes)].map((c) => ({
-        clau: c,
-        denominacio: clau(c)?.denominacio || '',
-        tipus: clau(c)?.tipus || '',
-        article: clau(c)?.article || '',
-        parametres: paramsDeClau(c)
-          .map((x) => ({ p: x.parametre, v: x.valor, n: x.valor_numeric, u: x.unitat, remet: x.remet_a })),
-        subdivisions: subdivDeClau(c).map((s) => ({ codi: s.codi, nom: s.denominacio })),
-      })),
+      claus: [...new Set(totes)].map((c) => {
+        if (!clau(c)) senseClau.add(c)
+        return {
+          clau: c,
+          denominacio: clau(c)?.denominacio || '',
+          tipus: clau(c)?.tipus || '',
+          article: clau(c)?.article || '',
+          parametres: paramsDeClau(c)
+            .map((x) => ({ p: x.parametre, v: x.valor, n: x.valor_numeric, u: x.unitat, remet: x.remet_a })),
+          subdivisions: subdivDeClau(c).map((s) => ({ codi: s.codi, nom: s.denominacio })),
+        }
+      }),
       font: {
         volum: `POUPE Vol. ${p.volum}`,
         bopa_num: p.bopa_num, bopa_data: p.bopa_data, bopa_pagina: p.bopa_pagina,
@@ -155,9 +160,12 @@ for (const u of ua) {
     fase: f.fase_aprovacio, drive_id: f.drive_id,
   })).sort((a, b) => a.modificacio.localeCompare(b.modificacio))
 
-    const proteccions = prot.filter((p) => p.id_ua === id)
-    .map((p) => ({ nom: p.nom, categoria: p.categoria, tipus: p.tipus,
-                   adreca: p.adreca, obligacio: p.obligacio, article: p.article }))
+  const proteccions = prot.filter((p) => p.id_ua === id)
+    .map((p) => ({
+      nom: p.nom, categoria: p.categoria, tipus: p.tipus,
+      adreca: p.adreca, obligacio: p.obligacio, article: p.article,
+    }))
+
   await writeFile(`${OUT}/ua/${id}.json`,
     JSON.stringify({ id, nom: u.nom_oficial, versions, historic, proteccions }, null, 0))
 
@@ -166,6 +174,7 @@ for (const u of ua) {
     classificacio: versions.map((v) => v.classificacio).filter(Boolean).join(' · '),
     families: [...new Set(versions.map((v) => v.familia))],
     revisar: versions.some((v) => v.revisar),
+    proteccions: proteccions.length,
   })
 }
 
@@ -174,6 +183,7 @@ index.sort((a, b) => a.nom.localeCompare(b.nom, 'ca'))
 await writeFile(`${OUT}/index.json`, JSON.stringify(index))
 await writeFile(`${OUT}/glossari.json`, JSON.stringify(glossari))
 await writeFile(`${OUT}/claus.json`, JSON.stringify(cls))
+await writeFile(`${OUT}/proteccions.json`, JSON.stringify(prot))
 await writeFile(`${OUT}/regles.json`, JSON.stringify(
   regles.filter((r) => r.estat !== 'PENDENT DE REDACTAR')))
 await writeFile(`${OUT}/config.json`, JSON.stringify({
@@ -182,13 +192,9 @@ await writeFile(`${OUT}/config.json`, JSON.stringify({
   tributs,
 }))
 
-const senseClau = new Set()
-for (const u of index) {
-  const d = JSON.parse(await import('node:fs/promises').then((f) => f.readFile(`${OUT}/ua/${u.id}.json`, 'utf8')))
-  for (const v of d.versions) for (const c of v.claus) if (!c.denominacio) senseClau.add(c.clau)
-}
-
 console.log(`\n${index.length} unitats generades a ${OUT}`)
 console.log(`${index.filter((i) => i.revisar).length} amb dades pendents de revisió`)
 console.log(`${planols.length} plànols enllaçats`)
+console.log(`${prot.length} béns protegits, ${index.filter((i) => i.proteccions).length} unitats amb protecció`)
+if (!tributs.length) console.log('AVÍS: la pestanya Tributs és buida.')
 if (senseClau.size) console.log(`Claus sense definició al Volum II: ${[...senseClau].join(', ')}`)

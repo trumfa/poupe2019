@@ -104,6 +104,7 @@ for (const u of ua) {
       ordenacio: p.ordenacio,
       usos: p.usos,
       gestio: p.gestio,
+      planol: planolPerFitxa[p.id_fitxa] || '',
       cobertura: p.cobertura,
       revisar: p.revisar,
       compartit: p.compartit,
